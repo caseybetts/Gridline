@@ -1,0 +1,8 @@
+[project]
+name = "gridline"
+version = "0.1.0"
+description = "Config-driven vertical slice for the Gridline tower defense prototype."
+requires-python = ">=3.13"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

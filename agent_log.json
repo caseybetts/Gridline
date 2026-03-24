@@ -1,0 +1,465 @@
+{
+    "log_version": "1.0.0",
+    "project": "Gridline",
+    "purpose": "Cross-agent coordination log for planning, implementation, testing, and review handoffs.",
+    "timezone": "America/Denver",
+    "created_at": "2026-03-24T00:00:00-06:00",
+    "maintainers": [
+        "Planner",
+        "Designer",
+        "Coder",
+        "Reviewer",
+        "Tester",
+        "AssetCreator"
+    ],
+    "entry_schema_notes": {
+        "entry_id": "Unique ID per log event",
+        "agent": "Agent role writing the entry",
+        "timestamp": "ISO-8601 with timezone offset",
+        "status": "completed | partial | blocked",
+        "looked_at": "Files/context reviewed before acting",
+        "intent": "What the agent intended to do",
+        "updates_made": "Concrete files changed and summary",
+        "next_step_suggestions": "Actionable handoff suggestions for next agent"
+    },
+    "entries": [
+        {
+            "entry_id": "designer-20260324-001",
+            "agent": "Designer",
+            "timestamp": "2026-03-24T13:46:05.9645993-06:00",
+            "status": "completed",
+            "looked_at": [
+                "agent_log.json",
+                "Designer_Prompt.md",
+                "game_summary.md"
+            ],
+            "intent": [
+                "Create a fresh primary game design document for ongoing system specifications.",
+                "Give the Coder agent a stable outline to build against while leaving room for detailed feature specs to be added iteratively."
+            ],
+            "updates_made": [
+                {
+                    "file": "Game_Design.md",
+                    "change_type": "created",
+                    "summary": "Added the primary design document with project purpose, core loop, design principles, a reusable feature-spec template, planned system sections, and currently agreed design inputs."
+                }
+            ],
+            "next_step_suggestions": [
+                "Designer: expand the placeholder sections into atomic feature specs starting with grid topology, orb firing, and corruption state behavior.",
+                "Coder: use Game_Design.md as the primary outline for upcoming implementation work, but defer unresolved balance details until their feature sections are fully specified.",
+                "Planner: continue feeding new high-level decisions into the design doc so summary and implementation stay aligned."
+            ]
+        },
+        {
+            "entry_id": "designer-20260324-002",
+            "agent": "Designer",
+            "timestamp": "2026-03-24T13:51:07.3800028-06:00",
+            "status": "completed",
+            "looked_at": [
+                "agent_log.json",
+                "game_summary.md",
+                "Game_Design.md"
+            ],
+            "intent": [
+                "Expand the primary design outline into coder-usable system specifications based on the current game summary.",
+                "Capture concrete rules, procedures, edge cases, data requirements, and UI expectations for the MVP systems already agreed."
+            ],
+            "updates_made": [
+                {
+                    "file": "Game_Design.md",
+                    "change_type": "updated",
+                    "summary": "Replaced placeholder sections with detailed feature specs for grid topology, hardpoints, orb travel, line states, economy, enemy pressure, power tower behavior, and HUD requirements."
+                }
+            ],
+            "next_step_suggestions": [
+                "Designer: next expand the permanent tower archetypes into their own atomic specs with explicit stat variables and path-behavior rules.",
+                "Planner: answer the unresolved decisions on cleaning granularity, MVP enemy roster, and power tower deployment so the design can be locked further.",
+                "Coder: use the new Game_Design.md sections as the primary behavior reference for line-based systems and UI requirements."
+            ]
+        },
+        {
+            "entry_id": "designer-20260324-003",
+            "agent": "Designer",
+            "timestamp": "2026-03-24T14:10:00.9319278-06:00",
+            "status": "completed",
+            "looked_at": [
+                "agent_log.json",
+                "game_summary.md",
+                "Game_Design.md",
+                "user design clarifications in chat"
+            ],
+            "intent": [
+                "Incorporate the user's direct design answers into the primary game design specification.",
+                "Reduce ambiguity around orb cleaning, MVP enemies, shared tower behavior modes, line intensity levels, and power tower deployment behavior."
+            ],
+            "updates_made": [
+                {
+                    "file": "Game_Design.md",
+                    "change_type": "updated",
+                    "summary": "Locked continuous distance-based cleaning, defined the two MVP enemy types, added a permanent tower behavior mode system, standardized green/red to three intensity levels, and specified power tower deployment onto any hardpoint with temporary override/restore behavior."
+                }
+            ],
+            "next_step_suggestions": [
+                "Designer: next define the three permanent orb behavior modes with exact movement logic, strengths, and purchase rules.",
+                "Planner: clarify the Tower Striker fallback rule when no tower target exists and how damage should resolve while a hardpoint is under temporary power override.",
+                "Coder: treat the latest Game_Design.md entries as the current source of truth for MVP enemy roles, line-state intensity count, orb cleaning granularity, and power tower targeting."
+            ]
+        },
+        {
+            "entry_id": "planner-20260324-001",
+            "agent": "Planner",
+            "timestamp": "2026-03-24T14:23:48.4545867-06:00",
+            "status": "completed",
+            "looked_at": [
+                "agent_log.json",
+                "game_summary.md",
+                "Game_Design.md",
+                "Planner_Prompt.md"
+            ],
+            "intent": [
+                "Audit Game_Design.md against game_summary.md, treating the summary as the current source of truth.",
+                "Record required alignment changes and planner-side direction for the Designer before further spec expansion."
+            ],
+            "updates_made": [
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Added a planner alignment handoff for the Designer identifying where Game_Design.md diverges from game_summary.md and what should be revised next."
+                }
+            ],
+            "next_step_suggestions": [
+                "Designer: revise the document-purpose and usage-rule language so Game_Design.md is subordinate to game_summary.md until the Planner explicitly promotes a newer decision; the current wording incorrectly says the design doc becomes canonical once updated.",
+                "Designer: reconcile tower structure with the summary. The summary defines at least three MVP tower archetypes with distinct roles and named candidates (`Basic Tower`, `Seed Tower`, `Burst Tower`), while Game_Design.md currently reframes permanent towers as shared chassis with interchangeable behavior modes for all towers. Unless re-approved, restore the archetype-first model and treat behavior tuning/upgrades as archetype-specific rather than universal swaps.",
+                "Designer: add a dedicated tower-archetype section that preserves the summary's role split: some towers are stronger at cleaning, others stronger at enemy damage, and upgrade paths can shift that balance.",
+                "Designer: explicitly add the Seed Tower targeting-control levers and defaults from the summary: `closest_vs_random` 70/30, `red_vs_green` 70/30, and `darkest_vs_random` 60/40.",
+                "Designer: carry forward summary details that are currently missing or under-specified in the design doc, including per-tower snake parameters, `snake_tail_length` as a per-tower value, fire-rate upgrades, `hp` applying to both towers and enemies, `shot_range` applying to projectile-launching towers as needed, and the JSON-configurable `grid_access_tier` progression.",
+                "Designer: add the summary's MVP runtime and control requirements that are absent or too implicit: `Esc` quits, fullscreen toggle support, and HUD telemetry for active orb count, recent shots fired, and selected tower readiness/cooldown.",
+                "Designer: keep enemy and corruption design grounded in the summary's survival priority ordering: protecting overall grid integrity is primary, protecting towers is secondary.",
+                "Designer: retain the design doc's stronger system detail where it does not conflict with the summary, especially the tier-aware spread rules, line-native movement rules, enemy line-constrained pathing, and power-tower override flow.",
+                "Designer: after revision, append a fresh log entry summarizing exactly how the design doc was brought back into alignment with game_summary.md so the Coder can trust the relationship between the two documents."
+            ]
+        },
+        {
+            "entry_id": "planner-20260324-002",
+            "agent": "Planner",
+            "timestamp": "2026-03-24T14:36:04.5872575-06:00",
+            "status": "completed",
+            "looked_at": [
+                "agent_log.json",
+                "game_summary.md",
+                "Game_Design.md",
+                "Planner_Prompt.md",
+                "user clarification in chat"
+            ],
+            "intent": [
+                "Lock the new tower-direction decision in the project summary.",
+                "Give the Designer an updated planner handoff that replaces the earlier assumption of either fully fixed archetypes or fully shared universal behaviors."
+            ],
+            "updates_made": [
+                {
+                    "file": "game_summary.md",
+                    "change_type": "updated",
+                    "summary": "Revised the tower model so the player still places one of three base tower archetypes, each placed tower keeps a default identity/behavior, and each individual tower may purchase exactly one additional orb behavior at meaningful cost."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Added a planner coordination entry directing the Designer to align Game_Design.md to the new hybrid tower model."
+                }
+            ],
+            "next_step_suggestions": [
+                "Designer: update Game_Design.md so it now reflects the approved hybrid model: three base tower archetypes at placement time, each with a default behavior, plus exactly one purchasable secondary orb behavior per placed tower.",
+                "Designer: do not describe towers as fully interchangeable universal chassis, and do not allow unlimited behavior acquisition unless the Planner changes direction later.",
+                "Designer: specify whether each tower archetype has one fixed secondary option or a limited shortlist of eligible secondary behaviors; preserve tower identity either way.",
+                "Designer: define whether switching between a tower's primary and purchased secondary behavior is manual, contextual, or cooldown-gated.",
+                "Coder: continue treating game_summary.md as source of truth for tower structure until the revised Game_Design.md catches up."
+            ]
+        },
+        {
+            "entry_id": "designer-20260324-004",
+            "agent": "Designer",
+            "timestamp": "2026-03-24T14:42:44.1702950-06:00",
+            "status": "completed",
+            "looked_at": [
+                "agent_log.json",
+                "game_summary.md",
+                "Game_Design.md",
+                "planner-20260324-001",
+                "planner-20260324-002"
+            ],
+            "intent": [
+                "Bring Game_Design.md back into alignment with the planner-directed source-of-truth relationship and updated hybrid tower model.",
+                "Route remaining unresolved design questions to the Planner through the agent log instead of direct chat."
+            ],
+            "updates_made": [
+                {
+                    "file": "Game_Design.md",
+                    "change_type": "updated",
+                    "summary": "Revised source-of-truth language to subordinate the design doc to game_summary.md, restored archetype-first tower structure, added dedicated sections for base tower archetypes and Seed Tower targeting levers, preserved per-tower/per-type upgrade details, and removed the prior universal-chassis framing."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Recorded planner-alignment changes and redirected unresolved tower/behavior questions to the Planner in next-step suggestions."
+                }
+            ],
+            "next_step_suggestions": [
+                "Planner: decide whether each base tower archetype has one fixed secondary behavior option or a limited shortlist of eligible options.",
+                "Planner: decide whether switching between default and purchased secondary behavior is manual, automatic by context, or cooldown-gated.",
+                "Planner: define the fallback behavior for Tower Striker when no valid tower target exists.",
+                "Planner: lock the damage-resolution rule when a hardpoint hosting an underlying tower is temporarily overridden by power tower behavior.",
+                "Designer: after Planner clarification, update Game_Design.md with the final secondary-behavior mapping and control flow so the Coder can implement tower behavior switching confidently."
+            ]
+        },
+        {
+            "entry_id": "designer-20260324-005",
+            "agent": "Designer",
+            "timestamp": "2026-03-24T14:44:04.5950433-06:00",
+            "status": "completed",
+            "looked_at": [
+                "agent_log.json",
+                "Game_Design.md"
+            ],
+            "intent": [
+                "Remove the last wording conflict after the planner-alignment pass.",
+                "Make the document header and design principles consistent with the summary-first authority model and archetype-first tower identity."
+            ],
+            "updates_made": [
+                {
+                    "file": "Game_Design.md",
+                    "change_type": "updated",
+                    "summary": "Reworded the document purpose so game_summary.md remains authoritative until Planner promotion, and clarified design principles around grid-integrity priority and archetype-first tower identity."
+                }
+            ],
+            "next_step_suggestions": [
+                "Planner: continue answering unresolved tower-behavior mapping and control-flow questions through agent_log.json.",
+                "Designer: use future planner answers to finalize the archetype-to-secondary-behavior matrix and switching rules.",
+                "Coder: treat the current Game_Design.md as aligned to the latest planner guidance, but continue resolving any future ambiguities through the planner-approved log trail."
+            ]
+        },
+        {
+            "entry_id": "planner-20260324-003",
+            "agent": "Planner",
+            "timestamp": "2026-03-24T14:49:20.9805308-06:00",
+            "status": "completed",
+            "looked_at": [
+                "agent_log.json",
+                "game_summary.md",
+                "Game_Design.md",
+                "Planner_Prompt.md",
+                "designer-20260324-004",
+                "designer-20260324-005"
+            ],
+            "intent": [
+                "Answer the unresolved design questions the Designer routed to the Planner through the coordination log.",
+                "Lock those decisions into game_summary.md so the Designer can update Game_Design.md without ambiguity."
+            ],
+            "updates_made": [
+                {
+                    "file": "game_summary.md",
+                    "change_type": "updated",
+                    "summary": "Locked four planner decisions: each base archetype gets one fixed secondary behavior option for MVP, behavior switching is manual and cooldown-gated, Tower Striker falls back to a corruption-seeding behavior when no tower target exists, and power-tower override damage applies only to the temporary power state while the underlying tower is suspended and restored intact."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Added planner answers for the Designer's unresolved tower-behavior, enemy fallback, and power-override questions."
+                }
+            ],
+            "next_step_suggestions": [
+                "Designer: update Game_Design.md to reflect the now-locked decisions from game_summary.md.",
+                "Designer: define one fixed secondary behavior option for each of `Basic Tower`, `Seed Tower`, and `Burst Tower`; do not use a broad shared shortlist for MVP.",
+                "Designer: specify behavior switching as a manual player action with a cooldown gate, not as an automatic context swap.",
+                "Designer: update `Tower Striker` so when no valid tower target exists it reroutes into a corruption-pressure role by pathing to a valid interior line target and creating a red corruption source on arrival.",
+                "Designer: lock the power-tower override rule so incoming damage during power mode is applied only to the temporary power tower state, with the underlying permanent tower suspended, untargetable, and restored in its pre-power state after expiry or early destruction.",
+                "Coder: continue using game_summary.md as source of truth for these clarified behaviors until the revised Game_Design.md is logged."
+            ]
+        },
+        {
+            "entry_id": "designer-20260324-006",
+            "agent": "Designer",
+            "timestamp": "2026-03-24T14:52:44.4929947-06:00",
+            "status": "completed",
+            "looked_at": [
+                "agent_log.json",
+                "game_summary.md",
+                "Game_Design.md",
+                "planner-20260324-003"
+            ],
+            "intent": [
+                "Apply the Planner's newly locked answers to the design specification.",
+                "Remove stale ambiguity around tower secondary behavior structure, Tower Striker fallback, and power-tower override damage handling."
+            ],
+            "updates_made": [
+                {
+                    "file": "Game_Design.md",
+                    "change_type": "updated",
+                    "summary": "Locked fixed secondary behavior structure per archetype, manual cooldown-gated behavior swapping, Tower Striker fallback into corruption seeding when no tower target exists, and temporary-power-only damage handling with underlying tower suspension and intact restoration."
+                }
+            ],
+            "next_step_suggestions": [
+                "Planner: provide the exact secondary behavior assigned to each of Basic, Seed, and Burst Tower.",
+                "Planner: define the interior-line target priority rule for Tower Striker fallback targeting.",
+                "Planner: define the temporary power-state stat profile so the power tower can be implemented without balance guesses.",
+                "Designer: after those planner answers arrive, finish the remaining tower-specific numeric and behavior-detail pass in Game_Design.md."
+            ]
+        },
+        {
+            "entry_id": "planner-20260324-004",
+            "agent": "Planner",
+            "timestamp": "2026-03-24T14:56:44.1367575-06:00",
+            "status": "completed",
+            "looked_at": [
+                "agent_log.json",
+                "game_summary.md",
+                "Game_Design.md",
+                "Planner_Prompt.md",
+                "designer-20260324-006"
+            ],
+            "intent": [
+                "Take action on the latest designer handoff by closing remaining planner-level behavior questions with best-judgment decisions.",
+                "Reduce implementation ambiguity while preserving the summary's high-level role as source of truth."
+            ],
+            "updates_made": [
+                {
+                    "file": "game_summary.md",
+                    "change_type": "updated",
+                    "summary": "Locked planner-level role bias for the three MVP base towers, assigned fixed secondary behaviors to each archetype, defined deterministic Tower Striker fallback target priority, and set the MVP power tower profile as a cleaning-first emergency stabilizer with strong local-to-midfield reach and free rapid output."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Added a planner handoff directing the Designer to carry the new tower-role, fallback-targeting, and power-profile decisions into Game_Design.md."
+                }
+            ],
+            "next_step_suggestions": [
+                "Designer: update Game_Design.md so the fixed secondary mapping is explicit: `Basic Tower -> Guard Mode`, `Seed Tower -> Recall Mode`, `Burst Tower -> Focus Mode`.",
+                "Designer: reflect the planner-locked role bias in the tower sections: `Basic Tower` as balanced all-rounder, `Seed Tower` as strongest long-reach map control, `Burst Tower` as strongest local area denial/interception.",
+                "Designer: define `Tower Striker` fallback targeting in priority order: non-red interior line first, then closer-to-center, then higher-connectivity targets, then green over blue, then random among remaining ties.",
+                "Designer: update the power tower section so its intended profile is clearly cleaning-first emergency stabilization with strong local-to-midfield reach, finest-tier traversal for MVP, rapid free output, and meaningful downside if destroyed early.",
+                "Designer: leave exact numeric tuning open unless a later planner pass locks values; the current decision is directional profile and priority, not final balance math.",
+                "Coder: until the design doc is refreshed, use game_summary.md for the named secondary behaviors and fallback targeting priorities."
+            ]
+        },
+        {
+            "entry_id": "designer-20260324-007",
+            "agent": "Designer",
+            "timestamp": "2026-03-24T14:59:30.1903446-06:00",
+            "status": "completed",
+            "looked_at": [
+                "agent_log.json",
+                "game_summary.md",
+                "Game_Design.md",
+                "planner-20260324-004"
+            ],
+            "intent": [
+                "Apply the Planner's latest archetype-role, secondary-mode, fallback-targeting, and power-profile decisions to the design doc.",
+                "Reduce remaining behavior ambiguity without inventing numeric balance values that the Planner has not locked."
+            ],
+            "updates_made": [
+                {
+                    "file": "Game_Design.md",
+                    "change_type": "updated",
+                    "summary": "Added explicit tower role bias, fixed secondary behavior names and definitions, deterministic Tower Striker fallback targeting priority, and the MVP power tower directional profile as a cleaning-first emergency stabilizer."
+                }
+            ],
+            "next_step_suggestions": [
+                "Planner: lock numeric profiles for the three base towers, the three secondary modes, and the temporary power state when ready.",
+                "Designer: after numeric planner guidance arrives, complete the remaining tuning pass in Game_Design.md without changing the now-locked directional roles.",
+                "Coder: use the updated Game_Design.md for named secondary behaviors, fallback targeting order, and power tower role intent while leaving exact balance numbers configurable."
+            ]
+        },
+        {
+            "entry_id": "designer-20260324-008",
+            "agent": "Designer",
+            "timestamp": "2026-03-24T15:08:31.8440205-06:00",
+            "status": "completed",
+            "looked_at": [
+                "agent_log.json",
+                "Game_Design.md"
+            ],
+            "intent": [
+                "Turn the design file into an implementation-grade MVP spec by adding concrete starter constants and tables.",
+                "Provide architecture guidance that reduces coder drift without prescribing exact class names or file structure."
+            ],
+            "updates_made": [
+                {
+                    "file": "Game_Design.md",
+                    "change_type": "updated",
+                    "summary": "Added concrete MVP starter constants for visuals, grid topology, timing, economy, towers, secondary modes, enemies, line spread, power tower, UI layout, and a responsibility-level runtime architecture outline with suggested function surfaces."
+                }
+            ],
+            "next_step_suggestions": [
+                "Coder: use the new MVP Starter Constants and runtime architecture guidance as the default implementation target for the first working draft.",
+                "Planner: if any of the proposed starter values are outside intended scope, revise them explicitly in game_summary.md or agent_log.json so the next design pass can tighten them.",
+                "Designer: after coder feedback, refine any constants that prove too weak, too strong, or visually unclear in the first playable build."
+            ]
+        },
+        {
+            "entry_id": "planner-20260324-005",
+            "agent": "Planner",
+            "timestamp": "2026-03-24T15:14:06.1851585-06:00",
+            "status": "completed",
+            "looked_at": [
+                "agent_log.json",
+                "game_summary.md",
+                "Game_Design.md",
+                "Planner_Prompt.md",
+                "designer-20260324-008"
+            ],
+            "intent": [
+                "Re-audit Game_Design.md against game_summary.md after the Designer added implementation-grade starter constants.",
+                "Close remaining planner-level ambiguity that could let the Coder drift from intended MVP behavior."
+            ],
+            "updates_made": [
+                {
+                    "file": "game_summary.md",
+                    "change_type": "updated",
+                    "summary": "Approved the MVP Starter Constants in Game_Design.md as the default implementation target for the first playable build, closed tower sell/scrap for MVP, locked Seed Tower lever clamping/display rules, clarified Tower Striker fallback as ordered priority resolution rather than weighted scoring, and locked MVP telemetry visibility expectations."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Added a planner cleanup handoff directing the Designer to remove stale contradictions and ambiguous open-question wording from Game_Design.md."
+                }
+            ],
+            "next_step_suggestions": [
+                "Designer: update Game_Design.md so it explicitly matches the latest summary approvals instead of leaving stale ambiguity.",
+                "Designer: in the hardpoint/build section, lock `tower sell/scrap is not in MVP` rather than leaving it as an open question.",
+                "Designer: in the Seed Tower targeting section, specify clamp behavior as `0..100` in 5-point increments and display each lever as a split that sums to 100.",
+                "Designer: in the Tower Striker fallback section, remove any suggestion of future weighted formulas for MVP and state that fallback target selection is resolved by ordered priority rules with random tie-break only at the end.",
+                "Designer: in the HUD section, state that active orb count and recent shots remain visible by default in the first playable MVP build, even if they later become debug-only in a shipping pass.",
+                "Designer: clean up stale open-question and immediate-next-work wording that still implies base tower numbers, secondary-mode numbers, power-tower numbers, or fallback-targeting logic are undefined; those starter values are now planner-approved defaults for implementation.",
+                "Coder: treat the starter constants and rules already present in Game_Design.md as approved implementation defaults, and do not add MVP tower sell/scrap or alternate fallback-scoring systems unless later directed."
+            ]
+        },
+        {
+            "entry_id": "designer-20260324-009",
+            "agent": "Designer",
+            "timestamp": "2026-03-24T15:18:26.1410139-06:00",
+            "status": "completed",
+            "looked_at": [
+                "agent_log.json",
+                "game_summary.md",
+                "Game_Design.md",
+                "planner-20260324-005"
+            ],
+            "intent": [
+                "Apply the planner cleanup handoff so Game_Design.md stops implying stale ambiguity that has already been resolved.",
+                "Make the approved MVP defaults explicit for the Coder."
+            ],
+            "updates_made": [
+                {
+                    "file": "Game_Design.md",
+                    "change_type": "updated",
+                    "summary": "Locked tower sell/scrap out of MVP, specified Seed Tower lever clamp/display rules, clarified Tower Striker fallback as ordered priority resolution instead of weighted scoring, kept active orb/shots telemetry visible by default for the first MVP build, and marked the MVP Starter Constants as approved implementation defaults."
+                }
+            ],
+            "next_step_suggestions": [
+                "Coder: implement directly against the approved MVP Starter Constants and clarified MVP rules without adding tower sell/scrap or alternate fallback-scoring logic.",
+                "Designer: shift from specification expansion to post-implementation review once the first working draft exists.",
+                "Planner: only reopen these MVP defaults if playtest evidence or implementation constraints justify a change."
+            ]
+        }
+    ]
+}

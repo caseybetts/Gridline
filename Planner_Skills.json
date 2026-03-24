@@ -1,0 +1,123 @@
+[
+    {
+      "type": "function",
+      "function": {
+        "name": "generate_game_concept",
+        "description": "Create or refine the high-level game concept, including core loop, genre, target playtime, unique hook, and target audience. Output a structured summary.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "game_title": { "type": "string", "description": "Working title or codename" },
+            "genre": { "type": "string", "description": "e.g. 2D platformer, puzzle, roguelike" },
+            "core_loop": { "type": "string", "description": "One-sentence description of the main repeated gameplay" },
+            "unique_hook": { "type": "string", "description": "What makes this game stand out" },
+            "target_playtime_minutes": { "type": "integer", "description": "Estimated total playtime for a full experience" },
+            "target_audience": { "type": "string", "description": "e.g. casual mobile players, hardcore PC gamers" }
+          },
+          "required": ["game_title", "genre", "core_loop"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "create_feature_list",
+        "description": "Break the game concept into must-have features, nice-to-have features, and out-of-scope items. Prioritize by MVP (minimum viable product) for small indie scope. Output as prioritized lists.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "mvp_features": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Core features needed for a playable prototype (keep to 5-8 max)"
+            },
+            "stretch_features": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Polish or expansion ideas if time allows"
+            },
+            "out_of_scope": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Features explicitly excluded to keep scope small"
+            },
+            "priority_order": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Recommended implementation order for MVP features"
+            }
+          },
+          "required": ["mvp_features", "priority_order"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "define_milestones",
+        "description": "Divide the project into 3–5 realistic milestones with clear deliverables, estimated effort (in dev days or sessions), and success criteria. Ideal for solo/small-team indie timelines (2–12 weeks).",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "milestones": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "description": "e.g. 'Core Mechanics Prototype'" },
+                  "deliverables": { "type": "array", "items": { "type": "string" } },
+                  "estimated_days": { "type": "integer" },
+                  "success_criteria": { "type": "string" }
+                },
+                "required": ["name", "deliverables"]
+              }
+            }
+          },
+          "required": ["milestones"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "assign_tasks_to_roles",
+        "description": "Convert high-level features or milestone deliverables into specific, actionable tasks assigned to roles (Coder, Artist, Reviewer, etc.). Include acceptance criteria and dependencies.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "tasks": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "description": { "type": "string" },
+                  "assigned_role": { "type": "string", "enum": ["Coder", "AssetCreator", "Reviewer", "Tester", "Planner"] },
+                  "dependencies": { "type": "array", "items": { "type": "string" }, "description": "Previous task IDs or descriptions this depends on" },
+                  "acceptance_criteria": { "type": "array", "items": { "type": "string" } }
+                },
+                "required": ["description", "assigned_role", "acceptance_criteria"]
+              }
+            }
+          },
+          "required": ["tasks"]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "balance_and_scope_check",
+        "description": "Review proposed features/milestones for scope creep, fun factor, technical risk, and balance. Suggest cuts, simplifications, or tweaks to keep the game fun and finishable by a small team.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "current_plan_summary": { "type": "string" },
+            "concerns": { "type": "array", "items": { "type": "string" } },
+            "recommended_changes": { "type": "array", "items": { "type": "string" } },
+            "revised_priority": { "type": "boolean", "description": "Whether the plan needs re-prioritization" }
+          },
+          "required": ["current_plan_summary", "concerns"]
+        }
+      }
+    }
+  ]

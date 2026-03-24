@@ -1,0 +1,186 @@
+{
+  "display": {
+    "mode": "windowed",
+    "fullscreen_toggle_enabled": true,
+    "window_width": 1280,
+    "window_height": 720
+  },
+  "visuals": {
+    "palette": {
+      "background": [4, 7, 13],
+      "panel": [10, 14, 22],
+      "text": [204, 214, 228],
+      "grid_blue": [48, 78, 126],
+      "grid_green": [88, 190, 148],
+      "grid_red": [186, 82, 96],
+      "tower_active": [164, 176, 196],
+      "tower_idle": [74, 84, 104],
+      "enemy": [138, 104, 114],
+      "orb_head": [240, 238, 225],
+      "orb_trail": [178, 212, 232]
+    },
+    "grid_layer_width_by_tier": {
+      "large": 2,
+      "medium": 1,
+      "small": 1
+    },
+    "grid_layer_glow_alpha_by_tier": {
+      "large": 78,
+      "medium": 24,
+      "small": 8
+    },
+    "orb_trail_width": 3,
+    "orb_head_radius": 5,
+    "enemy_radius": 5,
+    "tower_radius": 9,
+    "grid_scale_multiplier": 0.5
+  },
+  "telemetry": {
+    "show_active_orb_count": true,
+    "show_shots_fired_recent": true,
+    "show_selected_tower_readiness": true
+  },
+  "run": {
+    "mode": "endless",
+    "target_minutes_min": 10,
+    "target_minutes_max": 15,
+    "corruption_loss_threshold_percent": 80,
+    "level_up_interval_seconds": 60
+  },
+  "tower_placement": {
+    "mode": "edge_hardpoints",
+    "hardpoint_count": 8,
+    "activation_cost_by_slot": [30, 40, 50, 65, 80, 100, 125, 150]
+  },
+  "grid": {
+    "map_count": 1,
+    "line_states": ["blue", "green", "red"],
+    "intensity_levels": 3,
+    "overlap_rule": "cancel_and_keep_current_color",
+    "red_to_blue_passes_by_intensity": [1, 2, 3],
+    "green_to_blue_passes_by_intensity": [1, 1, 2]
+  },
+  "economy": {
+    "starting_coins": 2000,
+    "enemy_kill_income_enabled": false,
+    "green_harvest_income_by_intensity": [1, 2, 4],
+    "early_game_forgiving": true
+  },
+  "upgrades": {
+    "global_for_run": true,
+    "stats": ["fire_rate", "hp", "snake_speed", "hit_damage", "shot_range", "grid_access_tier"],
+    "cost_curve_multiplier": 1.18
+  },
+  "towers": [
+    {
+      "id": "basic_tower",
+      "display_name": "Basic Tower",
+      "role": "balanced",
+      "emission_mode": "spawn_at_tower",
+      "build_cost": 60,
+      "shot_cost": 1,
+      "base_fire_rate": 1.4,
+      "base_hit_damage": 5,
+      "base_snake_speed": 1.0,
+      "base_shot_range": 0,
+      "base_hp": 100,
+      "snake_tail_length": 12,
+      "grid_access_start": "large",
+      "grid_access_max": "small",
+      "path_behavior": "mostly_straight",
+      "orb_lifetime_seconds": 4.0
+    },
+    {
+      "id": "seed_tower",
+      "display_name": "Seed Tower",
+      "role": "cleaning_focus",
+      "emission_mode": "projectile_seed",
+      "build_cost": 90,
+      "shot_cost": 2,
+      "base_fire_rate": 0.8,
+      "base_hit_damage": 4,
+      "base_snake_speed": 1.1,
+      "base_shot_range": 14,
+      "base_hp": 90,
+      "snake_tail_length": 16,
+      "grid_access_start": "large",
+      "grid_access_max": "small",
+      "path_behavior": "random_walk",
+      "seed_targeting": {
+        "closest_vs_random_percent": 70,
+        "red_vs_green_percent": 70,
+        "darkest_vs_random_percent": 60
+      },
+      "orb_lifetime_seconds": 5.0
+    },
+    {
+      "id": "burst_tower",
+      "display_name": "Burst Tower",
+      "role": "damage_focus",
+      "emission_mode": "spawn_at_tower",
+      "build_cost": 120,
+      "shot_cost": 4,
+      "base_fire_rate": 0.5,
+      "base_hit_damage": 7,
+      "base_snake_speed": 1.3,
+      "base_shot_range": 0,
+      "base_hp": 110,
+      "snake_tail_length": 10,
+      "grid_access_start": "large",
+      "grid_access_max": "small",
+      "path_behavior": "high_random_short_life",
+      "burst_count": 3,
+      "orb_lifetime_seconds": 2.2
+    }
+  ],
+  "corruption": {
+    "spread_algorithm": "adjacent_outward_growth",
+    "base_spread_interval_seconds": 1.2,
+    "enemy_can_seed_new_sites": true,
+    "enemy_can_boost_spread_speed": true,
+    "spread_profile_by_tier": {
+      "large": 1,
+      "medium": 1,
+      "small": 1
+    }
+  },
+  "enemies": {
+    "spawn_mode": "continuous_random",
+    "movement_mode": "line_constrained",
+    "random_spawn_interval_min_seconds": 1.8,
+    "random_spawn_interval_max_seconds": 3.8,
+    "base_spawn_count_per_interval": 1,
+    "spawn_count_increase_per_level": 0.12,
+    "types": [
+      {
+        "id": "raider",
+        "display_name": "Raider",
+        "hp": 25,
+        "attacks_towers": true,
+        "corruption_behavior": "none"
+      },
+      {
+        "id": "corrupter",
+        "display_name": "Corrupter",
+        "hp": 18,
+        "attacks_towers": false,
+        "corruption_behavior": "both"
+      }
+    ]
+  },
+  "surges": {
+    "enabled": true,
+    "cadence": "random",
+    "corrupter_surge_enabled": true,
+    "random_interval_min_seconds": 35,
+    "random_interval_max_seconds": 70
+  },
+  "power_tower": {
+    "enabled": true,
+    "funding_step_percent": 10,
+    "single_charge_only": true,
+    "manual_deploy_anytime_when_charged": true,
+    "duration_seconds": 5,
+    "free_actions_while_active": true
+  }
+}

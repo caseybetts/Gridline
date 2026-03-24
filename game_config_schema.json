@@ -1,0 +1,555 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gridline.game.config.schema.v1",
+  "title": "Gridline Game Config v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "display",
+    "run",
+    "tower_placement",
+    "grid",
+    "economy",
+    "upgrades",
+    "towers",
+    "corruption",
+    "enemies",
+    "surges",
+    "power_tower"
+  ],
+  "properties": {
+    "display": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "fullscreen_toggle_enabled", "window_width", "window_height"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["windowed"]
+        },
+        "fullscreen_toggle_enabled": {
+          "type": "boolean"
+        },
+        "window_width": {
+          "type": "integer",
+          "minimum": 800
+        },
+        "window_height": {
+          "type": "integer",
+          "minimum": 600
+        }
+      }
+    },
+    "visuals": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "palette": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "background": { "$ref": "#/$defs/color_triplet" },
+            "panel": { "$ref": "#/$defs/color_triplet" },
+            "text": { "$ref": "#/$defs/color_triplet" },
+            "grid_blue": { "$ref": "#/$defs/color_triplet" },
+            "grid_green": { "$ref": "#/$defs/color_triplet" },
+            "grid_red": { "$ref": "#/$defs/color_triplet" },
+            "tower_active": { "$ref": "#/$defs/color_triplet" },
+            "tower_idle": { "$ref": "#/$defs/color_triplet" },
+            "enemy": { "$ref": "#/$defs/color_triplet" },
+            "orb_head": { "$ref": "#/$defs/color_triplet" },
+            "orb_trail": { "$ref": "#/$defs/color_triplet" }
+          }
+        },
+        "grid_layer_width_by_tier": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "large": { "type": "integer", "minimum": 1 },
+            "medium": { "type": "integer", "minimum": 1 },
+            "small": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "grid_layer_glow_alpha_by_tier": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "large": { "type": "integer", "minimum": 0, "maximum": 255 },
+            "medium": { "type": "integer", "minimum": 0, "maximum": 255 },
+            "small": { "type": "integer", "minimum": 0, "maximum": 255 }
+          }
+        },
+        "orb_trail_width": { "type": "integer", "minimum": 1 },
+        "orb_head_radius": { "type": "integer", "minimum": 1 },
+        "enemy_radius": { "type": "integer", "minimum": 1 },
+        "tower_radius": { "type": "integer", "minimum": 1 },
+        "grid_scale_multiplier": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "telemetry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "show_active_orb_count": { "type": "boolean" },
+        "show_shots_fired_recent": { "type": "boolean" },
+        "show_selected_tower_readiness": { "type": "boolean" }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "target_minutes_min",
+        "target_minutes_max",
+        "corruption_loss_threshold_percent",
+        "level_up_interval_seconds"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["endless"]
+        },
+        "target_minutes_min": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "target_minutes_max": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "corruption_loss_threshold_percent": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "level_up_interval_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "tower_placement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "hardpoint_count", "activation_cost_by_slot"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["edge_hardpoints"]
+        },
+        "hardpoint_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "activation_cost_by_slot": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "grid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["map_count", "line_states", "intensity_levels"],
+      "properties": {
+        "map_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1
+        },
+        "line_states": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "string",
+            "enum": ["blue", "green", "red"]
+          }
+        },
+        "intensity_levels": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "overlap_rule": {
+          "type": "string",
+          "enum": ["cancel_and_keep_current_color"]
+        },
+        "red_to_blue_passes_by_intensity": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "green_to_blue_passes_by_intensity": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "economy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "starting_coins",
+        "enemy_kill_income_enabled",
+        "green_harvest_income_by_intensity",
+        "early_game_forgiving"
+      ],
+      "properties": {
+        "starting_coins": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "enemy_kill_income_enabled": {
+          "type": "boolean"
+        },
+        "green_harvest_income_by_intensity": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "early_game_forgiving": {
+          "type": "boolean"
+        }
+      }
+    },
+    "upgrades": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "global_for_run",
+        "stats",
+        "cost_curve_multiplier"
+      ],
+      "properties": {
+        "global_for_run": {
+          "type": "boolean"
+        },
+        "stats": {
+          "type": "array",
+          "minItems": 6,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": ["fire_rate", "hp", "snake_speed", "hit_damage", "shot_range", "grid_access_tier"]
+          }
+        },
+        "cost_curve_multiplier": {
+          "type": "number",
+          "minimum": 1
+        }
+      }
+    },
+    "towers": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "display_name",
+          "role",
+          "emission_mode",
+          "build_cost",
+          "shot_cost",
+          "base_fire_rate",
+          "base_hit_damage",
+          "base_snake_speed",
+          "base_shot_range",
+          "base_hp",
+          "snake_tail_length",
+          "grid_access_start",
+          "grid_access_max",
+          "path_behavior"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["balanced", "cleaning_focus", "damage_focus"]
+          },
+          "emission_mode": {
+            "type": "string",
+            "enum": ["projectile_seed", "spawn_at_tower"]
+          },
+          "build_cost": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "shot_cost": {
+            "type": "number",
+            "minimum": 0
+          },
+          "base_fire_rate": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "base_hit_damage": {
+            "type": "number",
+            "minimum": 0
+          },
+          "base_snake_speed": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "base_shot_range": {
+            "type": "number",
+            "minimum": 0
+          },
+          "base_hp": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "snake_tail_length": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "grid_access_start": {
+            "type": "string",
+            "enum": ["large", "medium", "small"]
+          },
+          "grid_access_max": {
+            "type": "string",
+            "enum": ["large", "medium", "small"]
+          },
+          "path_behavior": {
+            "type": "string",
+            "enum": ["mostly_straight", "random_walk", "high_random_short_life"]
+          },
+          "seed_targeting": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "closest_vs_random_percent",
+              "red_vs_green_percent",
+              "darkest_vs_random_percent"
+            ],
+            "properties": {
+              "closest_vs_random_percent": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "red_vs_green_percent": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "darkest_vs_random_percent": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              }
+            }
+          },
+          "burst_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "orb_lifetime_seconds": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        }
+      }
+    },
+    "corruption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "spread_algorithm",
+        "base_spread_interval_seconds",
+        "enemy_can_seed_new_sites",
+        "enemy_can_boost_spread_speed"
+      ],
+      "properties": {
+        "spread_algorithm": {
+          "type": "string"
+        },
+        "base_spread_interval_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "enemy_can_seed_new_sites": {
+          "type": "boolean"
+        },
+        "enemy_can_boost_spread_speed": {
+          "type": "boolean"
+        },
+        "spread_profile_by_tier": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["large", "medium", "small"],
+          "properties": {
+            "large": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "medium": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "small": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "enemies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "spawn_mode",
+        "movement_mode",
+        "random_spawn_interval_min_seconds",
+        "random_spawn_interval_max_seconds",
+        "base_spawn_count_per_interval",
+        "spawn_count_increase_per_level",
+        "types"
+      ],
+      "properties": {
+        "spawn_mode": {
+          "type": "string",
+          "enum": ["continuous_random"]
+        },
+        "movement_mode": {
+          "type": "string",
+          "enum": ["line_constrained"]
+        },
+        "random_spawn_interval_min_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "random_spawn_interval_max_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "base_spawn_count_per_interval": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "spawn_count_increase_per_level": {
+          "type": "number",
+          "minimum": 0
+        },
+        "types": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "display_name", "hp", "attacks_towers", "corruption_behavior"],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "display_name": {
+                "type": "string"
+              },
+              "hp": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "attacks_towers": {
+                "type": "boolean"
+              },
+              "corruption_behavior": {
+                "type": "string",
+                "enum": ["none", "seed_drop", "spread_boost", "both"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "surges": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "cadence", "corrupter_surge_enabled"],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "cadence": {
+          "type": "string",
+          "enum": ["random"]
+        },
+        "corrupter_surge_enabled": {
+          "type": "boolean"
+        },
+        "random_interval_min_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "random_interval_max_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "power_tower": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "funding_step_percent",
+        "single_charge_only",
+        "manual_deploy_anytime_when_charged",
+        "duration_seconds",
+        "free_actions_while_active"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "funding_step_percent": {
+          "type": "integer",
+          "enum": [10]
+        },
+        "single_charge_only": {
+          "type": "boolean"
+        },
+        "manual_deploy_anytime_when_charged": {
+          "type": "boolean"
+        },
+        "duration_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "free_actions_while_active": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "color_triplet": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      }
+    }
+  }
+}
