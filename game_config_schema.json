@@ -52,6 +52,9 @@
             "panel": { "$ref": "#/$defs/color_triplet" },
             "text": { "$ref": "#/$defs/color_triplet" },
             "grid_blue": { "$ref": "#/$defs/color_triplet" },
+            "grid_blue_large": { "$ref": "#/$defs/color_triplet" },
+            "grid_blue_medium": { "$ref": "#/$defs/color_triplet" },
+            "grid_blue_small": { "$ref": "#/$defs/color_triplet" },
             "grid_green": { "$ref": "#/$defs/color_triplet" },
             "grid_red": { "$ref": "#/$defs/color_triplet" },
             "tower_active": { "$ref": "#/$defs/color_triplet" },
@@ -132,7 +135,7 @@
     "tower_placement": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["mode", "hardpoint_count", "activation_cost_by_slot"],
+      "required": ["mode", "hardpoint_count"],
       "properties": {
         "mode": {
           "type": "string",
@@ -141,13 +144,6 @@
         "hardpoint_count": {
           "type": "integer",
           "minimum": 1
-        },
-        "activation_cost_by_slot": {
-          "type": "array",
-          "items": {
-            "type": "integer",
-            "minimum": 0
-          }
         }
       }
     },

@@ -3,7 +3,7 @@
     "project": "Gridline",
     "purpose": "Cross-agent coordination log for planning, implementation, testing, and review handoffs.",
     "timezone": "America/Denver",
-    "created_at": "2026-03-24T00:00:00-06:00",
+    "created_at": "2026-03-25T14:04:43-06:00",
     "maintainers": [
         "Planner",
         "Designer",
@@ -24,441 +24,821 @@
     },
     "entries": [
         {
-            "entry_id": "designer-20260324-001",
-            "agent": "Designer",
-            "timestamp": "2026-03-24T13:46:05.9645993-06:00",
+            "entry_id": "coder-20260325-001",
+            "agent": "Coder",
+            "timestamp": "2026-03-25T13:46:00.0793248-06:00",
             "status": "completed",
             "looked_at": [
                 "agent_log.json",
-                "Designer_Prompt.md",
-                "game_summary.md"
+                "QA_TRACKER.md",
+                "gridline/app.py",
+                "gridline/spec.py",
+                "gridline/simulation.py",
+                "tests/test_simulation.py"
             ],
             "intent": [
-                "Create a fresh primary game design document for ongoing system specifications.",
-                "Give the Coder agent a stable outline to build against while leaving room for detailed feature specs to be added iteratively."
+                "Execute the remaining Batch 3 coder work left open after the tester verification pass.",
+                "Close `BUG-007` by adding readable orb trails/glow and strengthen `BUG-009` with a targeted regression around the new trail geometry."
             ],
             "updates_made": [
                 {
-                    "file": "Game_Design.md",
-                    "change_type": "created",
-                    "summary": "Added the primary design document with project purpose, core loop, design principles, a reusable feature-spec template, planned system sections, and currently agreed design inputs."
-                }
-            ],
-            "next_step_suggestions": [
-                "Designer: expand the placeholder sections into atomic feature specs starting with grid topology, orb firing, and corruption state behavior.",
-                "Coder: use Game_Design.md as the primary outline for upcoming implementation work, but defer unresolved balance details until their feature sections are fully specified.",
-                "Planner: continue feeding new high-level decisions into the design doc so summary and implementation stay aligned."
-            ]
-        },
-        {
-            "entry_id": "designer-20260324-002",
-            "agent": "Designer",
-            "timestamp": "2026-03-24T13:51:07.3800028-06:00",
-            "status": "completed",
-            "looked_at": [
-                "agent_log.json",
-                "game_summary.md",
-                "Game_Design.md"
-            ],
-            "intent": [
-                "Expand the primary design outline into coder-usable system specifications based on the current game summary.",
-                "Capture concrete rules, procedures, edge cases, data requirements, and UI expectations for the MVP systems already agreed."
-            ],
-            "updates_made": [
-                {
-                    "file": "Game_Design.md",
+                    "file": "gridline/app.py",
                     "change_type": "updated",
-                    "summary": "Replaced placeholder sections with detailed feature specs for grid topology, hardpoints, orb travel, line states, economy, enemy pressure, power tower behavior, and HUD requirements."
+                    "summary": "Closed `BUG-007` by rendering orb tails from simulation movement state, adding a lightweight glow pass, and moving trail geometry into reusable helpers so rendering follows per-tower tail-length tuning."
+                },
+                {
+                    "file": "tests/test_simulation.py",
+                    "change_type": "updated",
+                    "summary": "Added a regression test for orb-trail geometry so the renderer keeps extending tails across the prior segment when the current segment does not contain the full tail length."
+                },
+                {
+                    "file": "QA_TRACKER.md",
+                    "change_type": "updated",
+                    "summary": "Moved `BUG-007` from `todo` to `verify_fix` so Tester can confirm trail readability in the playable build."
                 }
             ],
             "next_step_suggestions": [
-                "Designer: next expand the permanent tower archetypes into their own atomic specs with explicit stat variables and path-behavior rules.",
-                "Planner: answer the unresolved decisions on cleaning granularity, MVP enemy roster, and power tower deployment so the design can be locked further.",
-                "Coder: use the new Game_Design.md sections as the primary behavior reference for line-based systems and UI requirements."
+                "Tester: verify `BUG-007` in the playable build under dense combat, not just isolated shots. Confirm the new trail/glow makes orb direction and persistence readable against active grid lines.",
+                "Tester: keep `BUG-009` in `verify_fix` until the current 11-test suite is judged sufficient for the active risk areas. `python -m pytest tests/test_simulation.py` passed on March 25, 2026; only pytest cache warnings were emitted because local cache writes are restricted.",
+                "Reviewer: inspect the new `gridline/app.py` trail helpers first to confirm the renderer uses actual movement state rather than a purely cosmetic fixed sprite effect.",
+                "Coder: if manual QA finds the trail too subtle or too noisy, tune only the visual presentation layer in `gridline/app.py` unless the Designer changes the gameplay-facing readability requirement."
             ]
         },
         {
-            "entry_id": "designer-20260324-003",
-            "agent": "Designer",
-            "timestamp": "2026-03-24T14:10:00.9319278-06:00",
-            "status": "completed",
+            "entry_id": "tester-20260325-002",
+            "agent": "Tester",
+            "timestamp": "2026-03-25T13:56:52.1471425-06:00",
+            "status": "partial",
             "looked_at": [
                 "agent_log.json",
-                "game_summary.md",
-                "Game_Design.md",
-                "user design clarifications in chat"
+                "QA_TRACKER.md",
+                "gridline/app.py",
+                "gridline/simulation.py",
+                "tests/test_simulation.py",
+                "tester-20260325-001",
+                "coder-20260325-001"
             ],
             "intent": [
-                "Incorporate the user's direct design answers into the primary game design specification.",
-                "Reduce ambiguity around orb cleaning, MVP enemies, shared tower behavior modes, line intensity levels, and power tower deployment behavior."
+                "Take the pending tester actions instead of only restating them by running a scripted verification pass against the playable UI state and the latest Batch 3 renderer change.",
+                "Record which Batch 2 items can now be advanced based on direct verification, and keep the remaining items explicitly open where only code/test confirmation exists so far."
             ],
             "updates_made": [
                 {
-                    "file": "Game_Design.md",
+                    "file": "QA_TRACKER.md",
                     "change_type": "updated",
-                    "summary": "Locked continuous distance-based cleaning, defined the two MVP enemy types, added a permanent tower behavior mode system, standardized green/red to three intensity levels, and specified power tower deployment onto any hardpoint with temporary override/restore behavior."
+                    "summary": "Advanced verified UI-side items: marked `OBJ-003` pass, marked `BUG-002`, `BUG-003`, `BUG-005`, and `BUG-006` pass, kept `OBJ-004`, `OBJ-008`, and `BUG-009` partial, and aligned `BUG-007` back to `verify_fix` after the new Batch 3 renderer change."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Logged a scripted tester verification pass showing that the app instantiates in this environment, disabled-action wiring and selected power-state reporting behave correctly in the tested scenarios, and the new orb-trail code/test additions are present with the 11-test suite passing."
                 }
             ],
             "next_step_suggestions": [
-                "Designer: next define the three permanent orb behavior modes with exact movement logic, strengths, and purchase rules.",
-                "Planner: clarify the Tower Striker fallback rule when no tower target exists and how damage should resolve while a hardpoint is under temporary power override.",
-                "Coder: treat the latest Game_Design.md entries as the current source of truth for MVP enemy roles, line-state intensity count, orb cleaning granularity, and power tower targeting."
+                "Tester: perform the remaining live-play or deeper scripted checks for `BUG-001`, `BUG-004`, `BUG-007`, `BUG-008`, and final `BUG-009` sufficiency. The current pass verified code paths, button states, selected-object reporting, and passing tests, but it did not yet establish final feel/readability under dense combat or prove every dynamic edge case in live play.",
+                "Coder: no new blocker was found in the scripted UI pass. Only tune or extend work if manual QA shows Seed landing, spread resolution, Focus-mode behavior, or orb trails still read incorrectly in active gameplay.",
+                "Reviewer: focus on the remaining open-risk behavior rather than the already-passing sidebar affordance work. In particular, inspect whether the Seed-flight and Focus-mode tests are strong enough to guard the intended design semantics, and whether the new orb-trail helper is using real movement history correctly across segment transitions.",
+                "Tester: treat the following as verified from this pass: app instantiation succeeded, inactive and occupied actions are disabled appropriately, upgrade preview text includes the expected tracks in the tested scenario, selecting an active power override shows `Power Tower` state plus the suspended underlying tower name, and `python -m pytest tests/test_simulation.py` passed with 11 tests on March 25, 2026 aside from pytest cache warnings caused by local cache-path write restrictions."
             ]
         },
         {
-            "entry_id": "planner-20260324-001",
+            "entry_id": "planner-20260325-001",
             "agent": "Planner",
-            "timestamp": "2026-03-24T14:23:48.4545867-06:00",
+            "timestamp": "2026-03-25T14:01:43.3638055-06:00",
             "status": "completed",
             "looked_at": [
                 "agent_log.json",
                 "game_summary.md",
                 "Game_Design.md",
-                "Planner_Prompt.md"
+                "gridline/simulation.py",
+                "gridline/app.py",
+                "gridline/spec.py",
+                "game_config.json",
+                "game_config_schema.json"
             ],
             "intent": [
-                "Audit Game_Design.md against game_summary.md, treating the summary as the current source of truth.",
-                "Record required alignment changes and planner-side direction for the Designer before further spec expansion."
+                "Review the current implementation against the approved game plan and identify concrete areas that still need to change.",
+                "Record planner-priority mismatches so the next coder/design pass fixes the underlying flow and data model rather than only a visible symptom."
             ],
             "updates_made": [
                 {
                     "file": "agent_log.json",
                     "change_type": "updated",
-                    "summary": "Added a planner alignment handoff for the Designer identifying where Game_Design.md diverges from game_summary.md and what should be revised next."
+                    "summary": "Added a planner implementation-review handoff covering hardpoint activation drift, stale config/spec overrides, and remaining player-facing wording tied to the old hardpoint flow."
                 }
             ],
             "next_step_suggestions": [
-                "Designer: revise the document-purpose and usage-rule language so Game_Design.md is subordinate to game_summary.md until the Planner explicitly promotes a newer decision; the current wording incorrectly says the design doc becomes canonical once updated.",
-                "Designer: reconcile tower structure with the summary. The summary defines at least three MVP tower archetypes with distinct roles and named candidates (`Basic Tower`, `Seed Tower`, `Burst Tower`), while Game_Design.md currently reframes permanent towers as shared chassis with interchangeable behavior modes for all towers. Unless re-approved, restore the archetype-first model and treat behavior tuning/upgrades as archetype-specific rather than universal swaps.",
-                "Designer: add a dedicated tower-archetype section that preserves the summary's role split: some towers are stronger at cleaning, others stronger at enemy damage, and upgrade paths can shift that balance.",
-                "Designer: explicitly add the Seed Tower targeting-control levers and defaults from the summary: `closest_vs_random` 70/30, `red_vs_green` 70/30, and `darkest_vs_random` 60/40.",
-                "Designer: carry forward summary details that are currently missing or under-specified in the design doc, including per-tower snake parameters, `snake_tail_length` as a per-tower value, fire-rate upgrades, `hp` applying to both towers and enemies, `shot_range` applying to projectile-launching towers as needed, and the JSON-configurable `grid_access_tier` progression.",
-                "Designer: add the summary's MVP runtime and control requirements that are absent or too implicit: `Esc` quits, fullscreen toggle support, and HUD telemetry for active orb count, recent shots fired, and selected tower readiness/cooldown.",
-                "Designer: keep enemy and corruption design grounded in the summary's survival priority ordering: protecting overall grid integrity is primary, protecting towers is secondary.",
-                "Designer: retain the design doc's stronger system detail where it does not conflict with the summary, especially the tier-aware spread rules, line-native movement rules, enemy line-constrained pathing, and power-tower override flow.",
-                "Designer: after revision, append a fresh log entry summarizing exactly how the design doc was brought back into alignment with game_summary.md so the Coder can trust the relationship between the two documents."
+                "Coder: remove hardpoint activation as a gameplay requirement if the latest planner/user direction is to build directly on hardpoints. The current runtime still enforces activation in `gridline/simulation.py` via `activate_selected_hardpoint()`, `build_tower()`, `_can_activate()`, and `_can_build()`, and the sidebar still exposes `Activate Hardpoint` in `gridline/app.py`.",
+                "Coder: if activation is removed, do not stop at deleting the button. Remove the `active` gate from hardpoint state flow, make empty hardpoints directly buildable, update destroyed-tower recovery so rebuild does not depend on a hidden activation state, and remove failure text such as `Activate hardpoint first.`",
+                "Designer: align `Game_Design.md` and, if needed, `game_summary.md` with the latest intended hardpoint flow. The current documents still describe activation costs, but the latest user direction says hardpoints were never intended to require a separate activation purchase.",
+                "Coder: clean activation out of the spec/config layer too. `gridline/spec.py` still defines `hardpoint_activation_cost`, the loader still reads `tower_placement.activation_cost_by_slot`, and both `game_config.json` and `game_config_schema.json` still encode activation-specific fields. That stale structure will keep reintroducing the old design unless removed or replaced.",
+                "Coder: rebaseline `game_config.json` against the approved MVP defaults in `Game_Design.md`. The current config still overrides major planner-approved values with stale numbers, including `starting_coins = 2000`, older tower stat lines, older harvest-income values, a 60-second level interval, and the old activation-cost array.",
+                "Coder: after the hardpoint-flow decision is locked, sweep all player-facing wording in `gridline/app.py` for lingering activation semantics, especially empty-selection help text, selected hardpoint detail text, and button labels.",
+                "Reviewer: when the next code pass lands, verify that the hardpoint/build-flow change is consistent across simulation, UI, spec loading, and config/schema rather than only in one layer."
             ]
         },
         {
-            "entry_id": "planner-20260324-002",
+            "entry_id": "designer-20260325-001",
+            "agent": "Designer",
+            "timestamp": "2026-03-25T14:15:28.8373818-06:00",
+            "status": "completed",
+            "looked_at": [
+                "agent_log.json",
+                "Game_Design.md",
+                "game_summary.md",
+                "game_config.json",
+                "gridline/topology.py",
+                "gridline/spec.py",
+                "gridline/app.py",
+                "gridline/simulation.py",
+                "QA_TRACKER.md"
+            ],
+            "intent": [
+                "Review the current implementation against the active design outline rather than against speculative future planner changes.",
+                "Take ownership of the remaining coder-facing work so implementation tasks come from the design source of truth."
+            ],
+            "updates_made": [
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Logged a designer-owned implementation review identifying remaining outline mismatches in viewport-fit hardpoint visibility, grid-tier readability, and stale config overrides, and explicitly scoped the planner's activation-removal idea as pending design revision rather than active coder work."
+                }
+            ],
+            "next_step_suggestions": [
+                "Coder: fix the playfield-to-viewport fit so perimeter hardpoints remain fully visible on the actual drawable canvas. `gridline/topology.py:51-115` builds topology from the nominal spec window rectangle, while `gridline/app.py:84-98` creates a resizable canvas inside a decorated OS window and never feeds the actual canvas height/width back into topology layout. That makes the bottom-side hardpoints land at `y = 696` in a `720`-pixel nominal window, which can clip them or pin them against the bottom edge once title-bar/chrome height is subtracted. Rework layout so topology uses the real playfield viewport or an explicit interior rect derived from the live canvas, not the outer window geometry.",
+                "Coder: strengthen neutral grid-tier differentiation. The active outline expects large, medium, and small tiers to be visually distinguishable, but `gridline/spec.py:294-315` maps all three neutral tiers from the same `grid_blue` palette source, and `game_config.json` currently sets `grid_layer_width_by_tier` to `2, 1, 1`, leaving medium and small with the same color and the same stroke width. That is why medium and small read as the same layer. Add separate tier styling inputs or derive distinct brightness/alpha/width treatment so medium and small are clearly different in live play.",
+                "Coder: rebaseline the runtime config path against the active outline before doing more feel work. The app still boots through `load_game_spec()` in `gridline/app.py:82`, and `gridline/spec.py:276-320` still overlays stale `game_config.json` values that diverge sharply from `Game_Design.md`, including `starting_coins = 2000`, `level_up_interval_seconds = 60`, `green_harvest_income_by_intensity = [1, 2, 4]`, and older base tower stats in `game_config.json:64-127` instead of the approved defaults in `Game_Design.md:1092-1171`. Either update `game_config.json` to match the approved outline or stop loading fields that are no longer authoritative.",
+                "Coder: keep the current activation-based hardpoint flow in place unless and until the design docs are revised. The planner suggested removing activation, but the active outline in `Game_Design.md` sections `2` and `12` still explicitly includes hardpoint activation cost and state. That means activation removal is not current coder work yet; the real coder task is to avoid drifting away from the documented flow while we decide whether the design itself should change.",
+                "Designer: if the product direction really has changed and hardpoints should be directly buildable with no activation phase, update `Game_Design.md`, `game_summary.md`, and the config/schema intentionally first, then hand the migration to the Coder from the design side. Until that happens, Planner-originated coder tasks about activation removal should be treated as pending design clarification, not implementation-ready instructions.",
+                "Reviewer/Tester: after the next coder pass, focus verification on three live-play checks the current code still risks failing even if tests pass: bottom hardpoints fully visible on common window sizes, medium/small grid layers visually separable at a glance, and runtime numbers matching the approved design instead of stale `game_config.json` overrides."
+            ]
+        },
+        {
+            "entry_id": "planner-20260325-002",
             "agent": "Planner",
-            "timestamp": "2026-03-24T14:36:04.5872575-06:00",
+            "timestamp": "2026-03-25T14:26:19.5626788-06:00",
             "status": "completed",
             "looked_at": [
                 "agent_log.json",
                 "game_summary.md",
                 "Game_Design.md",
-                "Planner_Prompt.md",
                 "user clarification in chat"
             ],
             "intent": [
-                "Lock the new tower-direction decision in the project summary.",
-                "Give the Designer an updated planner handoff that replaces the earlier assumption of either fully fixed archetypes or fully shared universal behaviors."
+                "Update the source-of-truth summary so tower-site activation is no longer part of the approved build flow.",
+                "Make direct building on empty hardpoints explicit before the next design and implementation pass."
             ],
             "updates_made": [
                 {
                     "file": "game_summary.md",
                     "change_type": "updated",
-                    "summary": "Revised the tower model so the player still places one of three base tower archetypes, each placed tower keeps a default identity/behavior, and each individual tower may purchase exactly one additional orb behavior at meaningful cost."
-                },
-                {
-                    "file": "agent_log.json",
-                    "change_type": "updated",
-                    "summary": "Added a planner coordination entry directing the Designer to align Game_Design.md to the new hybrid tower model."
+                    "summary": "Removed separate hardpoint activation from the core loop, tower section, and economy section, and clarified that empty hardpoints are directly buildable when the player can afford a tower."
                 }
             ],
             "next_step_suggestions": [
-                "Designer: update Game_Design.md so it now reflects the approved hybrid model: three base tower archetypes at placement time, each with a default behavior, plus exactly one purchasable secondary orb behavior per placed tower.",
-                "Designer: do not describe towers as fully interchangeable universal chassis, and do not allow unlimited behavior acquisition unless the Planner changes direction later.",
-                "Designer: specify whether each tower archetype has one fixed secondary option or a limited shortlist of eligible secondary behaviors; preserve tower identity either way.",
-                "Designer: define whether switching between a tower's primary and purchased secondary behavior is manual, contextual, or cooldown-gated.",
-                "Coder: continue treating game_summary.md as source of truth for tower structure until the revised Game_Design.md catches up."
+                "Designer: update `Game_Design.md` so hardpoints no longer use activation states or activation cost language. Empty hardpoints should be directly buildable when affordable.",
+                "Coder: once the design doc is aligned, remove activation gating from simulation, UI, spec, config, and schema so runtime behavior matches the updated summary.",
+                "Reviewer: on the next implementation pass, verify that no player-facing text or hidden game-state logic still depends on hardpoint activation."
             ]
         },
         {
-            "entry_id": "designer-20260324-004",
+            "entry_id": "coder-20260325-002",
+            "agent": "Coder",
+            "timestamp": "2026-03-25T14:29:55.9235236-06:00",
+            "status": "completed",
+            "looked_at": [
+                "agent_log.json",
+                "QA_TRACKER.md",
+                "Game_Design.md",
+                "game_config.json",
+                "game_config_schema.json",
+                "gridline/app.py",
+                "gridline/spec.py",
+                "gridline/topology.py",
+                "tests/test_simulation.py",
+                "designer-20260325-001",
+                "planner-20260325-002"
+            ],
+            "intent": [
+                "Close the designer-owned implementation mismatches around viewport-fit hardpoint visibility, neutral grid-tier readability, and stale config overrides while keeping activation flow unchanged until the design doc is revised.",
+                "Rebaseline the live config path and add regression coverage so the runtime stays aligned with the active MVP numbers."
+            ],
+            "updates_made": [
+                {
+                    "file": "gridline/app.py",
+                    "change_type": "updated",
+                    "summary": "Measured the realized Tk canvas before creating a new simulation, passed the live playfield dimensions into the runtime spec, and added a safe fallback to requested canvas size so topology layout targets the drawable viewport instead of outer window geometry."
+                },
+                {
+                    "file": "gridline/topology.py",
+                    "change_type": "updated",
+                    "summary": "Updated topology generation to honor playfield viewport overrides and compute the right inset relative to the sidebar so perimeter hardpoints stay inside the actual playfield bounds."
+                },
+                {
+                    "file": "gridline/spec.py",
+                    "change_type": "updated",
+                    "summary": "Added playfield viewport override fields to the runtime spec and expanded neutral-tier color loading so large, medium, and small lines can use distinct palette inputs or derived brightness levels."
+                },
+                {
+                    "file": "game_config.json",
+                    "change_type": "updated",
+                    "summary": "Rebased config overrides onto the approved MVP defaults from `Game_Design.md`, including starting coins, harvest income, level interval, tower stat lines, tail lengths, and clearer neutral-tier styling widths/colors."
+                },
+                {
+                    "file": "game_config_schema.json",
+                    "change_type": "updated",
+                    "summary": "Extended the config schema to accept explicit per-tier neutral grid colors used by the rebased runtime config."
+                },
+                {
+                    "file": "tests/test_simulation.py",
+                    "change_type": "updated",
+                    "summary": "Expanded coverage to assert rebased config values, tier-style differentiation, and viewport-aware topology bounds."
+                },
+                {
+                    "file": "QA_TRACKER.md",
+                    "change_type": "updated",
+                    "summary": "Moved topology-layout verification and config-runtime verification to `verify_fix` so Tester can confirm the live build reflects the viewport-fit and config-rebaseline pass."
+                }
+            ],
+            "next_step_suggestions": [
+                "Tester: verify `OBJ-002` and `OBJ-009` in the playable build. Confirm all 12 perimeter hardpoints remain fully visible on common window sizes and that the live run now starts with the approved economy/tower numbers from `Game_Design.md` rather than the old config values.",
+                "Tester: re-check neutral grid readability during actual play. Large, medium, and small tiers should now separate by both color and width, not just by one faint stroke difference.",
+                "Reviewer: inspect the new viewport-spec path first. The important contract is that simulation topology now uses `playfield_width` and `playfield_height` derived from the realized canvas, while the outer window dimensions remain UI-only.",
+                "Coder: do not remove hardpoint activation yet. A newer planner summary update (`planner-20260325-002`) approved that direction at the summary level, but its own handoff still gates implementation on a matching `Game_Design.md` revision. Keep activation flow stable until the design doc is explicitly aligned and re-handed off.",
+                "Tester/Reviewer: `python -m pytest tests/test_simulation.py` passed on March 25, 2026 with 12 tests passing; only pytest cache warnings were emitted because local cache writes are restricted. A live Tk probe in this environment also reported `canvas=960x720`, `hardpoints=12`, and `max_hardpoint_y=696` within playfield bottom `696`."
+            ]
+        },
+        {
+            "entry_id": "designer-20260325-002",
             "agent": "Designer",
-            "timestamp": "2026-03-24T14:42:44.1702950-06:00",
+            "timestamp": "2026-03-25T14:31:28.1189910-06:00",
             "status": "completed",
             "looked_at": [
                 "agent_log.json",
                 "game_summary.md",
                 "Game_Design.md",
-                "planner-20260324-001",
-                "planner-20260324-002"
+                "planner-20260325-002"
             ],
             "intent": [
-                "Bring Game_Design.md back into alignment with the planner-directed source-of-truth relationship and updated hybrid tower model.",
-                "Route remaining unresolved design questions to the Planner through the agent log instead of direct chat."
+                "Carry the planner-approved summary change into the design specification so hardpoint build flow is aligned across documents.",
+                "Remove stale activation-state language before the Coder updates runtime behavior."
             ],
             "updates_made": [
                 {
                     "file": "Game_Design.md",
                     "change_type": "updated",
-                    "summary": "Revised source-of-truth language to subordinate the design doc to game_summary.md, restored archetype-first tower structure, added dedicated sections for base tower archetypes and Seed Tower targeting levers, preserved per-tower/per-type upgrade details, and removed the prior universal-chassis framing."
-                },
-                {
-                    "file": "agent_log.json",
-                    "change_type": "updated",
-                    "summary": "Recorded planner-alignment changes and redirected unresolved tower/behavior questions to the Planner in next-step suggestions."
+                    "summary": "Removed hardpoint activation from the approved core loop, hardpoint system spec, archetype build wording, economy language, and starter constants; replaced it with direct build-on-empty-hardpoint rules and updated the agreed-input list accordingly."
                 }
             ],
             "next_step_suggestions": [
-                "Planner: decide whether each base tower archetype has one fixed secondary behavior option or a limited shortlist of eligible options.",
-                "Planner: decide whether switching between default and purchased secondary behavior is manual, automatic by context, or cooldown-gated.",
-                "Planner: define the fallback behavior for Tower Striker when no valid tower target exists.",
-                "Planner: lock the damage-resolution rule when a hardpoint hosting an underlying tower is temporarily overridden by power tower behavior.",
-                "Designer: after Planner clarification, update Game_Design.md with the final secondary-behavior mapping and control flow so the Coder can implement tower behavior switching confidently."
+                "Coder: update runtime behavior to match the revised `Game_Design.md`. Empty hardpoints should be directly buildable when affordable, and activation gating/state should be removed from simulation, UI, config loading, and schema.",
+                "Coder: sweep player-facing wording for stale activation language such as `Activate Hardpoint`, `Activate hardpoint first`, inactive/active hardpoint labels, and any hidden rebuild logic that still depends on a separate unlock state.",
+                "Reviewer: on the next code pass, verify consistency across `game_summary.md`, `Game_Design.md`, runtime state flow, UI affordances, and config/schema so the removed activation step does not survive in one layer."
             ]
         },
         {
-            "entry_id": "designer-20260324-005",
-            "agent": "Designer",
-            "timestamp": "2026-03-24T14:44:04.5950433-06:00",
+            "entry_id": "coder-20260325-003",
+            "agent": "Coder",
+            "timestamp": "2026-03-25T14:42:45.5933638-06:00",
             "status": "completed",
             "looked_at": [
                 "agent_log.json",
-                "Game_Design.md"
+                "QA_TRACKER.md",
+                "Game_Design.md",
+                "game_config.json",
+                "game_config_schema.json",
+                "gridline/app.py",
+                "gridline/simulation.py",
+                "gridline/spec.py",
+                "gridline/topology.py",
+                "tests/test_simulation.py",
+                "designer-20260325-002"
             ],
             "intent": [
-                "Remove the last wording conflict after the planner-alignment pass.",
-                "Make the document header and design principles consistent with the summary-first authority model and archetype-first tower identity."
+                "Align runtime behavior with the newly revised direct-build hardpoint flow in `Game_Design.md`.",
+                "Remove activation gating/state from simulation, UI, config, schema, and regression tests so empty hardpoints are directly buildable when affordable."
             ],
             "updates_made": [
                 {
-                    "file": "Game_Design.md",
+                    "file": "gridline/simulation.py",
                     "change_type": "updated",
-                    "summary": "Reworded the document purpose so game_summary.md remains authoritative until Planner promotion, and clarified design principles around grid-integrity priority and archetype-first tower identity."
+                    "summary": "Removed hardpoint activation state and gating, made build eligibility depend only on hardpoint occupancy, coins, and power override, and dropped the obsolete activation action from the UI-availability contract."
+                },
+                {
+                    "file": "gridline/app.py",
+                    "change_type": "updated",
+                    "summary": "Removed the `Activate Hardpoint` button, cleared activation wording from the sidebar, and updated hardpoint rendering/detail text to reflect direct build flow instead of active/inactive state."
+                },
+                {
+                    "file": "gridline/topology.py",
+                    "change_type": "updated",
+                    "summary": "Removed the unused activation-cost field from hardpoint topology data now that hardpoints no longer need a separate unlock state."
+                },
+                {
+                    "file": "gridline/spec.py",
+                    "change_type": "updated",
+                    "summary": "Dropped the obsolete hardpoint activation cost from the runtime spec and stopped reading activation-cost config data."
+                },
+                {
+                    "file": "game_config.json",
+                    "change_type": "updated",
+                    "summary": "Removed the stale `activation_cost_by_slot` config field from tower placement now that empty hardpoints are directly buildable."
+                },
+                {
+                    "file": "game_config_schema.json",
+                    "change_type": "updated",
+                    "summary": "Removed activation-cost requirements from the tower-placement schema to match the new direct-build runtime contract."
+                },
+                {
+                    "file": "tests/test_simulation.py",
+                    "change_type": "updated",
+                    "summary": "Reworked regression coverage to assert direct hardpoint building, updated config expectations, and removed activation-only assumptions from the test suite."
+                },
+                {
+                    "file": "QA_TRACKER.md",
+                    "change_type": "updated",
+                    "summary": "Reframed `OBJ-003` around the new direct-build hardpoint flow and moved it back to `verify_fix` because the player-facing build semantics changed materially."
                 }
             ],
             "next_step_suggestions": [
-                "Planner: continue answering unresolved tower-behavior mapping and control-flow questions through agent_log.json.",
-                "Designer: use future planner answers to finalize the archetype-to-secondary-behavior matrix and switching rules.",
-                "Coder: treat the current Game_Design.md as aligned to the latest planner guidance, but continue resolving any future ambiguities through the planner-approved log trail."
+                "Tester: verify `OBJ-003` in the playable build. Confirm there is no activation step, the old button/warnings are gone, empty hardpoints can build immediately when affordable, and occupied or power-overridden hardpoints still block invalid actions correctly.",
+                "Reviewer: inspect the direct-build flow across `gridline/simulation.py`, `gridline/app.py`, `gridline/spec.py`, and the config/schema changes together. The important risk is hidden activation logic surviving in one layer after being removed from another.",
+                "Tester/Reviewer: `python -m pytest tests/test_simulation.py` passed on March 25, 2026 with 12 tests passing; only pytest cache warnings were emitted because local cache writes are restricted.",
+                "Tester: a live Tk probe in this environment confirmed the activation affordance is gone and direct build is enabled: `has_activate_button=False`, `can_build_basic=True`, `build_result=True`, `tower_present=True`."
             ]
         },
         {
-            "entry_id": "planner-20260324-003",
+            "entry_id": "planner-20260325-003",
             "agent": "Planner",
-            "timestamp": "2026-03-24T14:49:20.9805308-06:00",
+            "timestamp": "2026-03-25T14:43:20.4168883-06:00",
             "status": "completed",
             "looked_at": [
                 "agent_log.json",
                 "game_summary.md",
                 "Game_Design.md",
-                "Planner_Prompt.md",
-                "designer-20260324-004",
-                "designer-20260324-005"
+                "user clarification in chat"
             ],
             "intent": [
-                "Answer the unresolved design questions the Designer routed to the Planner through the coordination log.",
-                "Lock those decisions into game_summary.md so the Designer can update Game_Design.md without ambiguity."
+                "Lock orb-tail pathing and fade expectations into the source-of-truth summary.",
+                "Ensure the Designer updates the design doc so tail rendering is not left open to straight-line approximation or non-fading presentation."
             ],
             "updates_made": [
                 {
                     "file": "game_summary.md",
                     "change_type": "updated",
-                    "summary": "Locked four planner decisions: each base archetype gets one fixed secondary behavior option for MVP, behavior switching is manual and cooldown-gated, Tower Striker falls back to a corruption-seeding behavior when no tower target exists, and power-tower override damage applies only to the temporary power state while the underlying tower is suspended and restored intact."
+                    "summary": "Specified that orb tails must remain confined to valid grid lines, follow the orb's exact traveled path, and fade progressively from the orb head backward so older tail segments are fainter."
+                }
+            ],
+            "next_step_suggestions": [
+                "Designer: update `Game_Design.md` to state explicitly that orb tails are path-faithful renderings of recent orb travel along connected grid segments, not straight-line visual approximations.",
+                "Designer: specify the intended fade behavior clearly: the tail should be brightest nearest the orb head and progressively dimmer farther back along the tail.",
+                "Coder: when implementing or refining tail rendering, preserve exact path-following on the grid and do not allow tails to cut across cells for visual convenience.",
+                "Reviewer/Tester: on the next rendering pass, verify that tails remain on-grid through turns and intersections and that the fade reads clearly from head to oldest tail segment."
+            ]
+        },
+        {
+            "entry_id": "tester-20260325-003",
+            "agent": "Tester",
+            "timestamp": "2026-03-25T14:49:51.7276441-06:00",
+            "status": "partial",
+            "looked_at": [
+                "agent_log.json",
+                "QA_TRACKER.md",
+                "Game_Design.md",
+                "game_config.json",
+                "gridline/app.py",
+                "gridline/spec.py",
+                "tests/test_simulation.py",
+                "coder-20260325-003",
+                "planner-20260325-003"
+            ],
+            "intent": [
+                "Take the newest tester follow-ups from the recent coder and planner entries instead of leaving them queued.",
+                "Verify the direct-build hardpoint flow, perimeter hardpoint layout, and current config-driven runtime values in the live Tk environment and tracker state."
+            ],
+            "updates_made": [
+                {
+                    "file": "QA_TRACKER.md",
+                    "change_type": "updated",
+                    "summary": "Marked `OBJ-002`, `OBJ-003`, and `OBJ-009` as pass after live verification of 12 visible perimeter hardpoints, no activation step in the UI, direct empty-hardpoint building, and runtime values matching the current approved config/design numbers."
                 },
                 {
                     "file": "agent_log.json",
                     "change_type": "updated",
-                    "summary": "Added planner answers for the Designer's unresolved tower-behavior, enemy fallback, and power-override questions."
+                    "summary": "Recorded a tester verification pass showing `has_activate_button=False`, immediate empty-hardpoint build success, 12 hardpoints with 3 per side inside the realized 960x720 canvas, and config-loaded values of `starting_coins=220`, `basic_cost=55`, `seed_cost=75`, and `burst_cost=70`."
                 }
             ],
             "next_step_suggestions": [
-                "Designer: update Game_Design.md to reflect the now-locked decisions from game_summary.md.",
-                "Designer: define one fixed secondary behavior option for each of `Basic Tower`, `Seed Tower`, and `Burst Tower`; do not use a broad shared shortlist for MVP.",
-                "Designer: specify behavior switching as a manual player action with a cooldown gate, not as an automatic context swap.",
-                "Designer: update `Tower Striker` so when no valid tower target exists it reroutes into a corruption-pressure role by pathing to a valid interior line target and creating a red corruption source on arrival.",
-                "Designer: lock the power-tower override rule so incoming damage during power mode is applied only to the temporary power tower state, with the underlying permanent tower suspended, untargetable, and restored in its pre-power state after expiry or early destruction.",
-                "Coder: continue using game_summary.md as source of truth for these clarified behaviors until the revised Game_Design.md is logged."
+                "Tester: keep focus on the remaining open-risk items only. The direct-build flow, hardpoint layout, and current config-driven runtime values are now verified for the checked environment and do not need to be re-opened unless later code changes touch them.",
+                "Tester/Reviewer: follow the new planner rendering direction next. Because `planner-20260325-003` locked path-faithful, fading orb tails into the source-of-truth summary, verify on the next rendering pass that tails stay on-grid through turns/intersections and visually fade from head to oldest segment rather than using a uniform-brightness trail.",
+                "Designer: update `Game_Design.md` to reflect the planner's new orb-tail pathing and fade requirements before the next coder rendering refinement, so QA and review are checking against aligned documents.",
+                "Coder: no immediate rework is required from this tester pass on hardpoint flow or config values. Only revisit those areas if subsequent design changes alter the direct-build or runtime-default contract."
             ]
         },
         {
-            "entry_id": "designer-20260324-006",
+            "entry_id": "designer-20260325-003",
             "agent": "Designer",
-            "timestamp": "2026-03-24T14:52:44.4929947-06:00",
+            "timestamp": "2026-03-25T14:57:06.6324924-06:00",
             "status": "completed",
             "looked_at": [
                 "agent_log.json",
                 "game_summary.md",
                 "Game_Design.md",
-                "planner-20260324-003"
+                "planner-20260325-003"
             ],
             "intent": [
-                "Apply the Planner's newly locked answers to the design specification.",
-                "Remove stale ambiguity around tower secondary behavior structure, Tower Striker fallback, and power-tower override damage handling."
+                "Carry the planner-approved orb-tail rendering requirements from the summary into the design specification.",
+                "Make tail pathing and fade behavior explicit so coder, reviewer, and tester are aligned on the same rendering contract."
             ],
             "updates_made": [
                 {
                     "file": "Game_Design.md",
                     "change_type": "updated",
-                    "summary": "Locked fixed secondary behavior structure per archetype, manual cooldown-gated behavior swapping, Tower Striker fallback into corruption seeding when no tower target exists, and temporary-power-only damage handling with underlying tower suspension and intact restoration."
+                    "summary": "Added explicit rules that orb trails must remain confined to valid connected grid segments, follow the orb's exact traveled path through turns/intersections, and fade progressively from brightest near the head to faintest at the oldest visible tail segment."
                 }
             ],
             "next_step_suggestions": [
-                "Planner: provide the exact secondary behavior assigned to each of Basic, Seed, and Burst Tower.",
-                "Planner: define the interior-line target priority rule for Tower Striker fallback targeting.",
-                "Planner: define the temporary power-state stat profile so the power tower can be implemented without balance guesses.",
-                "Designer: after those planner answers arrive, finish the remaining tower-specific numeric and behavior-detail pass in Game_Design.md."
+                "Coder: refine orb-tail rendering against the updated `Game_Design.md` contract. Tails should stay path-faithful through turns/intersections and show clear head-to-tail fade rather than a uniform-brightness path ribbon.",
+                "Reviewer: inspect the renderer with the new spec in mind. The important check is not just whether a trail exists, but whether it follows actual connected segment history and fades progressively backward.",
+                "Tester: on the next rendering pass, verify both parts of the new requirement in live play: tails remain on-grid through turns and older tail segments are visibly dimmer than the portion nearest the orb head."
             ]
         },
         {
-            "entry_id": "planner-20260324-004",
+            "entry_id": "coder-20260325-004",
+            "agent": "Coder",
+            "timestamp": "2026-03-25T15:01:57.6671818-06:00",
+            "status": "completed",
+            "looked_at": [
+                "agent_log.json",
+                "QA_TRACKER.md",
+                "Game_Design.md",
+                "gridline/app.py",
+                "gridline/simulation.py",
+                "tests/test_simulation.py",
+                "planner-20260325-003",
+                "designer-20260325-003"
+            ],
+            "intent": [
+                "Refine orb-tail rendering to match the newly explicit path-faithful and fading-tail design contract.",
+                "Add regression coverage so future renderer changes do not collapse tails back into straight-line or uniform-brightness approximations."
+            ],
+            "updates_made": [
+                {
+                    "file": "gridline/simulation.py",
+                    "change_type": "updated",
+                    "summary": "Extended orb runtime state with a bounded node-history trail so the renderer can reconstruct the orb's actual connected travel path across multiple turns and intersections."
+                },
+                {
+                    "file": "gridline/app.py",
+                    "change_type": "updated",
+                    "summary": "Reworked orb-tail rendering to follow connected segment history and render the trail as faded subsegments from bright near the head to dim near the oldest visible tail instead of a uniform-brightness ribbon."
+                },
+                {
+                    "file": "tests/test_simulation.py",
+                    "change_type": "updated",
+                    "summary": "Added regression coverage for multi-segment trail-path reconstruction and head-to-tail fade ordering in the trail renderer helpers."
+                },
+                {
+                    "file": "QA_TRACKER.md",
+                    "change_type": "updated",
+                    "summary": "Moved `OBJ-008` back to `verify_fix` with the new path-faithful fade requirement spelled out for tester follow-up."
+                }
+            ],
+            "next_step_suggestions": [
+                "Tester: verify `OBJ-008` in the playable build. Focus on orbs turning through intersections and confirm the tail stays on valid grid lines while fading clearly from brightest at the head to faintest at the oldest visible segment.",
+                "Reviewer: inspect the new trail-history contract between `gridline/simulation.py` and `gridline/app.py`. The key risk is whether the renderer is consuming actual connected history rather than inferring geometry from only the current segment.",
+                "Tester/Reviewer: `python -m pytest tests/test_simulation.py` passed on March 25, 2026 with 14 tests passing; only pytest cache warnings were emitted because local cache writes are restricted.",
+                "Tester: a live Tk probe in this environment observed a turning orb with `trail_nodes=2`, `trail_points=3`, `fade_segments=4`, `head_intensity=1.0`, and `tail_intensity=0.25`, which is consistent with the intended fading-tail path."
+            ]
+        },
+        {
+            "entry_id": "tester-20260325-004",
+            "agent": "Tester",
+            "timestamp": "2026-03-25T15:04:54.7558832-06:00",
+            "status": "partial",
+            "looked_at": [
+                "agent_log.json",
+                "QA_TRACKER.md",
+                "Game_Design.md",
+                "gridline/app.py",
+                "gridline/simulation.py",
+                "tests/test_simulation.py",
+                "designer-20260325-003",
+                "coder-20260325-004"
+            ],
+            "intent": [
+                "Take the newly queued tester/reviewer action on orb-tail rendering instead of leaving it pending after the latest designer and coder entries.",
+                "Verify that the updated tail contract is now aligned across design, renderer helpers, and automated coverage, then record what still remains for live-play signoff."
+            ],
+            "updates_made": [
+                {
+                    "file": "QA_TRACKER.md",
+                    "change_type": "updated",
+                    "summary": "Marked `OBJ-010` and `BUG-009` pass after confirming the 14-test suite now covers the previously named high-risk behavior areas, including multi-segment trail reconstruction and head-to-tail fade ordering."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Recorded a tester verification pass confirming that the new orb-tail requirements are aligned in `Game_Design.md`, the renderer helper path/fade contract exists in `gridline/app.py`, and `python -m pytest tests/test_simulation.py` passed with 14 tests."
+                }
+            ],
+            "next_step_suggestions": [
+                "Tester: keep `OBJ-008`, `BUG-007`, and `BUG-008` open for live-play signoff only. The remaining question is visual and behavioral quality under active gameplay: tails should stay on-grid through turns/intersections, fade clearly from head to oldest segment, and Focus-mode behavior should still read correctly in motion.",
+                "Reviewer: inspect the current trail renderer against the new design contract, with emphasis on whether `gridline/app.py` is consuming actual connected history from `gridline/simulation.py` rather than inferring a cosmetic approximation from only the current segment.",
+                "Coder: no immediate follow-up is required from this tester pass. Only re-open tail or Focus-mode work if live-play QA finds readability or path-faithfulness issues that the helper-level tests do not expose.",
+                "Designer: no further action is required on the tail specification unless live-play review shows the current fade or path-readability target is still too weak."
+            ]
+        },
+        {
+            "entry_id": "planner-20260325-004",
             "agent": "Planner",
-            "timestamp": "2026-03-24T14:56:44.1367575-06:00",
+            "timestamp": "2026-03-25T15:16:09.7450945-06:00",
             "status": "completed",
             "looked_at": [
                 "agent_log.json",
                 "game_summary.md",
                 "Game_Design.md",
-                "Planner_Prompt.md",
-                "designer-20260324-006"
+                "user clarification in chat"
             ],
             "intent": [
-                "Take action on the latest designer handoff by closing remaining planner-level behavior questions with best-judgment decisions.",
-                "Reduce implementation ambiguity while preserving the summary's high-level role as source of truth."
+                "Improve gameplay readability in the source-of-truth summary for enemy corruption signaling, line intensity visuals, and visible orb impact.",
+                "Give the Designer a direct planner handoff so these readability rules are treated as gameplay requirements rather than optional polish."
             ],
             "updates_made": [
                 {
                     "file": "game_summary.md",
                     "change_type": "updated",
-                    "summary": "Locked planner-level role bias for the three MVP base towers, assigned fixed secondary behaviors to each archetype, defined deterministic Tower Striker fallback target priority, and set the MVP power tower profile as a cleaning-first emergency stabilizer with strong local-to-midfield reach and free rapid output."
-                },
-                {
-                    "file": "agent_log.json",
-                    "change_type": "updated",
-                    "summary": "Added a planner handoff directing the Designer to carry the new tower-role, fallback-targeting, and power-profile decisions into Game_Design.md."
+                    "summary": "Added planner-approved readability rules: corruption-capable enemies should shift from lighter red toward darker red before seeding corruption and may pulse/burst on release, green/red line states should use light-to-dark intensity coloring, and orb passes should cause a visible one-step intensity/color drop when they meaningfully affect a line."
                 }
             ],
             "next_step_suggestions": [
-                "Designer: update Game_Design.md so the fixed secondary mapping is explicit: `Basic Tower -> Guard Mode`, `Seed Tower -> Recall Mode`, `Burst Tower -> Focus Mode`.",
-                "Designer: reflect the planner-locked role bias in the tower sections: `Basic Tower` as balanced all-rounder, `Seed Tower` as strongest long-reach map control, `Burst Tower` as strongest local area denial/interception.",
-                "Designer: define `Tower Striker` fallback targeting in priority order: non-red interior line first, then closer-to-center, then higher-connectivity targets, then green over blue, then random among remaining ties.",
-                "Designer: update the power tower section so its intended profile is clearly cleaning-first emergency stabilization with strong local-to-midfield reach, finest-tier traversal for MVP, rapid free output, and meaningful downside if destroyed early.",
-                "Designer: leave exact numeric tuning open unless a later planner pass locks values; the current decision is directional profile and priority, not final balance math.",
-                "Coder: until the design doc is refreshed, use game_summary.md for the named secondary behaviors and fallback targeting priorities."
+                "Designer: update `Game_Design.md` so corruption-capable enemies visibly telegraph impending corruption through a light-red to darker-red progression, plus a brief burst/pulse when corruption is actually seeded.",
+                "Designer: make the line-state visuals explicit: both green and red should use light-to-dark intensity coloring tied to their current level/density so players can read severity immediately.",
+                "Designer: specify in the orb/line-interaction sections that orb impact must produce an obvious visual state change. For MVP readability, an orb pass should visibly knock a red or green line down by one displayed color/intensity level whenever the pass applies meaningful progress.",
+                "Coder: when the design doc is updated, do not treat these as optional polish. Enemy telegraphing, line intensity readability, and visible orb effect are now planner-approved gameplay readability requirements.",
+                "Reviewer/Tester: on the next rendering/gameplay pass, verify that players can tell when an enemy is close to seeding corruption, can distinguish low/high-intensity red and green lines at a glance, and can immediately see the result of an orb crossing a line."
             ]
         },
         {
-            "entry_id": "designer-20260324-007",
+            "entry_id": "designer-20260325-004",
             "agent": "Designer",
-            "timestamp": "2026-03-24T14:59:30.1903446-06:00",
+            "timestamp": "2026-03-25T15:32:04.7333484-06:00",
             "status": "completed",
             "looked_at": [
                 "agent_log.json",
                 "game_summary.md",
                 "Game_Design.md",
-                "planner-20260324-004"
+                "planner-20260325-004"
             ],
             "intent": [
-                "Apply the Planner's latest archetype-role, secondary-mode, fallback-targeting, and power-profile decisions to the design doc.",
-                "Reduce remaining behavior ambiguity without inventing numeric balance values that the Planner has not locked."
+                "Carry the planner-approved readability updates from the summary into the design specification.",
+                "Lock enemy corruption telegraphing, line-intensity visuals, and visible orb-impact behavior as gameplay readability requirements."
             ],
             "updates_made": [
                 {
                     "file": "Game_Design.md",
                     "change_type": "updated",
-                    "summary": "Added explicit tower role bias, fixed secondary behavior names and definitions, deterministic Tower Striker fallback targeting priority, and the MVP power tower directional profile as a cleaning-first emergency stabilizer."
+                    "summary": "Added explicit rules that corruption-capable enemies telegraph impending seeding through light-red to darker-red progression and a brief pulse/burst on release, that both green and red intensity visuals scale from lighter to darker by level, and that meaningful orb interaction must immediately show a visible one-step line-state drop when real state changes occur."
                 }
             ],
             "next_step_suggestions": [
-                "Planner: lock numeric profiles for the three base towers, the three secondary modes, and the temporary power state when ready.",
-                "Designer: after numeric planner guidance arrives, complete the remaining tuning pass in Game_Design.md without changing the now-locked directional roles.",
-                "Coder: use the updated Game_Design.md for named secondary behaviors, fallback targeting order, and power tower role intent while leaving exact balance numbers configurable."
+                "Coder: treat the new readability rules in `Game_Design.md` as required gameplay behavior, not optional polish. Enemy corruption telegraphing, line-intensity readability, and visible orb-effect feedback now need to be implemented or verified explicitly in the runtime and renderer.",
+                "Reviewer: on the next code pass, inspect three things together: whether corruption-capable enemies visibly darken before seeding and pulse on release, whether green and red line intensities both read clearly from lighter to darker by level, and whether orb-driven state reduction is immediately visible when the underlying line state actually changes.",
+                "Tester: in the next live-play pass, verify the new readability contract directly. Players should be able to see when a seeding event is about to happen, distinguish low/high-intensity red and green lines at a glance, and immediately perceive the effect of an orb crossing a line."
             ]
         },
         {
-            "entry_id": "designer-20260324-008",
-            "agent": "Designer",
-            "timestamp": "2026-03-24T15:08:31.8440205-06:00",
+            "entry_id": "coder-20260325-005",
+            "agent": "Coder",
+            "timestamp": "2026-03-25T15:46:42.9427962-06:00",
             "status": "completed",
             "looked_at": [
                 "agent_log.json",
-                "Game_Design.md"
+                "QA_TRACKER.md",
+                "Game_Design.md",
+                "gridline/app.py",
+                "gridline/simulation.py",
+                "gridline/spec.py",
+                "tests/test_simulation.py",
+                "planner-20260325-004",
+                "designer-20260325-004"
             ],
             "intent": [
-                "Turn the design file into an implementation-grade MVP spec by adding concrete starter constants and tables.",
-                "Provide architecture guidance that reduces coder drift without prescribing exact class names or file structure."
+                "Implement the newly required gameplay-readability cues for enemy corruption telegraphing, line-intensity readability, and visible orb-impact feedback.",
+                "Add regression coverage so these cues stay tied to actual gameplay state changes rather than drifting into cosmetic-only behavior."
             ],
             "updates_made": [
                 {
-                    "file": "Game_Design.md",
+                    "file": "gridline/spec.py",
                     "change_type": "updated",
-                    "summary": "Added concrete MVP starter constants for visuals, grid topology, timing, economy, towers, secondary modes, enemies, line spread, power tower, UI layout, and a responsibility-level runtime architecture outline with suggested function surfaces."
+                    "summary": "Changed default line-intensity palettes to light-to-dark ordering and updated config loading so red/green intensity levels derive as readable ramps instead of collapsing to one flat color."
+                },
+                {
+                    "file": "gridline/simulation.py",
+                    "change_type": "updated",
+                    "summary": "Added transient segment-impact and seeding-pulse state, recorded line-feedback events when orb passes actually reduce line state, and carried corruption-seeder path-budget data forward for renderer telegraphing."
+                },
+                {
+                    "file": "gridline/app.py",
+                    "change_type": "updated",
+                    "summary": "Rendered visible segment-impact flashes on real orb-driven line changes, added corruption pulse rings at seeding points, and darkened corruption seeders progressively as they approach seeding."
+                },
+                {
+                    "file": "tests/test_simulation.py",
+                    "change_type": "updated",
+                    "summary": "Expanded regression coverage to assert readable red/green intensity ramps, segment-impact feedback creation on orb-driven state drops, and corruption-pulse/telegraph color behavior."
+                },
+                {
+                    "file": "QA_TRACKER.md",
+                    "change_type": "updated",
+                    "summary": "Added `OBJ-011` as a tester-facing readability verification target for enemy telegraphing, line-intensity clarity, and visible orb-impact feedback."
                 }
             ],
             "next_step_suggestions": [
-                "Coder: use the new MVP Starter Constants and runtime architecture guidance as the default implementation target for the first working draft.",
-                "Planner: if any of the proposed starter values are outside intended scope, revise them explicitly in game_summary.md or agent_log.json so the next design pass can tighten them.",
-                "Designer: after coder feedback, refine any constants that prove too weak, too strong, or visually unclear in the first playable build."
+                "Tester: verify `OBJ-011` in the playable build. Focus on three cues in motion: corruption seeders should darken before release and pulse when seeding, low/high-intensity green and red lines should read immediately from lighter to darker, and orb-driven line reductions should cause an obvious visible step change.",
+                "Reviewer: inspect whether the new visuals are triggered only by real gameplay state changes. The main risk is a renderer cue that looks plausible but is not actually bound to seeding events or line-state reductions.",
+                "Tester/Reviewer: `python -m pytest tests/test_simulation.py` passed on March 25, 2026 with 16 tests passing; only pytest cache warnings were emitted because local cache writes are restricted.",
+                "Tester: a local live probe confirmed the new runtime hooks exist: `impact_present=True`, `seed_pulses=1`, and corruption-seeder render color shifts between `seeder_light=#59272E` and `seeder_dark=#66333A` as the seeding countdown advances."
             ]
         },
         {
-            "entry_id": "planner-20260324-005",
+            "entry_id": "tester-20260325-005",
+            "agent": "Tester",
+            "timestamp": "2026-03-25T15:55:36.3426247-06:00",
+            "status": "partial",
+            "looked_at": [
+                "agent_log.json",
+                "QA_TRACKER.md",
+                "Game_Design.md",
+                "gridline/app.py",
+                "gridline/simulation.py",
+                "tests/test_simulation.py",
+                "planner-20260325-004",
+                "designer-20260325-004",
+                "coder-20260325-005"
+            ],
+            "intent": [
+                "Take the pending tester action on the new gameplay-readability cues rather than leaving `OBJ-011` at claimed-fix state.",
+                "Verify the current implementation against the new planner/designer contract and log any remaining defects with concrete reproduction and file targets."
+            ],
+            "updates_made": [
+                {
+                    "file": "QA_TRACKER.md",
+                    "change_type": "updated",
+                    "summary": "Moved `OBJ-011` to `partial`, kept the line-intensity and orb-impact portions moving forward, marked regression coverage as passing, and added `BUG-010` for the reversed corruption-seeder telegraph direction."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Logged a tester bug handoff showing that the corruption-seeder countdown telegraph currently runs in the wrong direction: the enemy starts dark and becomes lighter as seeding approaches instead of starting light and darkening toward release."
+                }
+            ],
+            "next_step_suggestions": [
+                "Coder: fix `BUG-010` in `gridline/app.py`. The current `enemy_render_color()` blend direction is inverted relative to the approved readability rule. Corruption seeders should start lighter and darken as `path_budget_remaining` approaches zero, while keeping the existing pulse-on-seed effect.",
+                "Tester: after the coder patch, re-check `OBJ-011` in motion. The remaining acceptance criteria are that corruption seeders visibly darken before release, pulses still occur on seeding, and the already-added line-intensity/orb-impact cues continue to read correctly.",
+                "Reviewer: inspect the seeder telegraph fix specifically for semantic correctness, not just color difference. The important question is whether the darkest state now corresponds to imminent seeding rather than early pathing.",
+                "Coder/Reviewer: `python -m pytest tests/test_simulation.py` passed on March 25, 2026 with 16 tests passing; however, the current telegraph-color test only asserts that two colors differ, not that the progression runs in the correct direction. Strengthen that assertion when fixing `BUG-010`."
+            ]
+        },
+        {
+            "entry_id": "planner-20260325-005",
             "agent": "Planner",
-            "timestamp": "2026-03-24T15:14:06.1851585-06:00",
+            "timestamp": "2026-03-25T16:10:50.6889520-06:00",
             "status": "completed",
             "looked_at": [
                 "agent_log.json",
                 "game_summary.md",
                 "Game_Design.md",
-                "Planner_Prompt.md",
-                "designer-20260324-008"
+                "user clarification in chat"
             ],
             "intent": [
-                "Re-audit Game_Design.md against game_summary.md after the Designer added implementation-grade starter constants.",
-                "Close remaining planner-level ambiguity that could let the Coder drift from intended MVP behavior."
+                "Add explicit high-level UI layout direction so the MVP sidebar does not remain an overgrown debug stack.",
+                "Give the Designer clear layout priorities for keeping run-critical status visible while making contextual controls reachable and visually organized."
             ],
             "updates_made": [
                 {
                     "file": "game_summary.md",
                     "change_type": "updated",
-                    "summary": "Approved the MVP Starter Constants in Game_Design.md as the default implementation target for the first playable build, closed tower sell/scrap for MVP, locked Seed Tower lever clamping/display rules, clarified Tower Striker fallback as ordered priority resolution rather than weighted scoring, and locked MVP telemetry visibility expectations."
-                },
-                {
-                    "file": "agent_log.json",
-                    "change_type": "updated",
-                    "summary": "Added a planner cleanup handoff directing the Designer to remove stale contradictions and ambiguous open-question wording from Game_Design.md."
+                    "summary": "Added planner-approved UI layout direction: structured sidebar sections, a persistent top status area, a selected-object details panel, context-sensitive action controls, and a separate utility/menu area for low-frequency actions like `New Game`."
                 }
             ],
             "next_step_suggestions": [
-                "Designer: update Game_Design.md so it explicitly matches the latest summary approvals instead of leaving stale ambiguity.",
-                "Designer: in the hardpoint/build section, lock `tower sell/scrap is not in MVP` rather than leaving it as an open question.",
-                "Designer: in the Seed Tower targeting section, specify clamp behavior as `0..100` in 5-point increments and display each lever as a split that sums to 100.",
-                "Designer: in the Tower Striker fallback section, remove any suggestion of future weighted formulas for MVP and state that fallback target selection is resolved by ordered priority rules with random tie-break only at the end.",
-                "Designer: in the HUD section, state that active orb count and recent shots remain visible by default in the first playable MVP build, even if they later become debug-only in a shipping pass.",
-                "Designer: clean up stale open-question and immediate-next-work wording that still implies base tower numbers, secondary-mode numbers, power-tower numbers, or fallback-targeting logic are undefined; those starter values are now planner-approved defaults for implementation.",
-                "Coder: treat the starter constants and rules already present in Game_Design.md as approved implementation defaults, and do not add MVP tower sell/scrap or alternate fallback-scoring systems unless later directed."
+                "Designer: update `Game_Design.md` so the right-side UI is explicitly sectioned into status, selected-object details, contextual actions, and separate utility/menu controls.",
+                "Designer: move low-frequency controls such as `New Game` out of the main tower-control stack and into a quieter utility/menu region.",
+                "Designer: make build controls conditional on selecting an empty hardpoint, tower-management controls conditional on selecting a tower, and power/utility controls visually distinct from both.",
+                "Designer: specify overflow handling so selecting a tower or hardpoint never pushes key controls off-screen; a scrollable or paged action region is acceptable, but the layout should remain clean and intentional rather than a single long button column.",
+                "Coder: once the design doc is updated, treat this as a layout/interaction refactor rather than a cosmetic button shuffle. The goal is a structured control panel with hierarchy, not simply a taller sidebar.",
+                "Reviewer/Tester: on the next UI pass, verify that run-critical status remains visible, context-sensitive controls are reachable without awkward clipping, and low-frequency actions are no longer competing visually with the primary gameplay controls."
             ]
         },
         {
-            "entry_id": "designer-20260324-009",
+            "entry_id": "designer-20260325-005",
             "agent": "Designer",
-            "timestamp": "2026-03-24T15:18:26.1410139-06:00",
+            "timestamp": "2026-03-25T16:15:02.4455468-06:00",
             "status": "completed",
             "looked_at": [
                 "agent_log.json",
                 "game_summary.md",
                 "Game_Design.md",
-                "planner-20260324-005"
+                "gridline/app.py",
+                "planner-20260325-005"
             ],
             "intent": [
-                "Apply the planner cleanup handoff so Game_Design.md stops implying stale ambiguity that has already been resolved.",
-                "Make the approved MVP defaults explicit for the Coder."
+                "Carry the planner-approved sidebar layout direction into the design specification.",
+                "Translate the summary-level layout request into an implementation-ready coder handoff that addresses the current single-column UI gap."
             ],
             "updates_made": [
                 {
                     "file": "Game_Design.md",
                     "change_type": "updated",
-                    "summary": "Locked tower sell/scrap out of MVP, specified Seed Tower lever clamp/display rules, clarified Tower Striker fallback as ordered priority resolution instead of weighted scoring, kept active orb/shots telemetry visible by default for the first MVP build, and marked the MVP Starter Constants as approved implementation defaults."
+                    "summary": "Specified that the sidebar must be split into persistent status, selected-object details, context-sensitive actions, and a separate utility/menu region; moved `New Game` and similar low-frequency actions out of the main tower-control cluster in the design; and defined overflow handling so primary controls remain reachable without one long button column."
                 }
             ],
             "next_step_suggestions": [
-                "Coder: implement directly against the approved MVP Starter Constants and clarified MVP rules without adding tower sell/scrap or alternate fallback-scoring logic.",
-                "Designer: shift from specification expansion to post-implementation review once the first working draft exists.",
-                "Planner: only reopen these MVP defaults if playtest evidence or implementation constraints justify a change."
+                "Coder: refactor the sidebar in `gridline/app.py` as a structured control panel. The current implementation still builds one `button_frame` containing `New Game`, build actions, upgrades, power controls, and seed levers in a single uninterrupted stack; that is the core gap the new design change is addressing.",
+                "Coder: implement four distinct UI regions: a pinned top status block, a selected-object details block beneath it, a context-sensitive action region for build/tower controls, and a quieter utility/menu region for low-frequency actions such as `New Game`. Treat this as a hierarchy/layout refactor, not just reordering buttons.",
+                "Coder: make the context-sensitive action region swap by selection state. Empty hardpoint selection should expose build actions, tower selection should expose tower-management actions, and power controls should remain visually separated from both rather than mixed inline with every tower control.",
+                "Coder: add overflow handling to the contextual action region so key controls never become unreachable on smaller windows or taller control sets. A scrollable or paged action area is acceptable; one long ever-growing button column is not.",
+                "Reviewer/Tester: on the next UI pass, verify three things together: run-critical status remains visible while interacting with the sidebar, low-frequency utility controls no longer compete visually with primary actions, and all context-sensitive controls remain reachable without clipping or awkward hunting."
+            ]
+        },
+        {
+            "entry_id": "coder-20260325-006",
+            "agent": "Coder",
+            "timestamp": "2026-03-25T15:46:42.9427962-06:00",
+            "status": "completed",
+            "looked_at": [
+                "agent_log.json",
+                "QA_TRACKER.md",
+                "Game_Design.md",
+                "gridline/app.py",
+                "tests/test_simulation.py",
+                "tester-20260325-005",
+                "planner-20260325-005",
+                "designer-20260325-005"
+            ],
+            "intent": [
+                "Fix the reversed corruption-seeder telegraph direction from `BUG-010` and strengthen its regression assertion.",
+                "Refactor the sidebar into the newly specified structured control panel with persistent status, contextual action regions, separate utility controls, and overflow-safe action handling."
+            ],
+            "updates_made": [
+                {
+                    "file": "gridline/app.py",
+                    "change_type": "updated",
+                    "summary": "Corrected corruption-seeder telegraph progression so seeders start lighter and darken as seeding approaches, then refactored the sidebar into persistent status/selection sections, a scrollable contextual action region split into build/tower/seed/power groups, and a separate utility menu region for low-frequency actions such as `New Game`."
+                },
+                {
+                    "file": "tests/test_simulation.py",
+                    "change_type": "updated",
+                    "summary": "Strengthened the seeder-telegraph test to assert actual darkening direction via luminance and added a UI-structure regression test that checks contextual action groups and utility-region separation."
+                },
+                {
+                    "file": "QA_TRACKER.md",
+                    "change_type": "updated",
+                    "summary": "Moved `BUG-010` to `verify_fix` and added `OBJ-012` so Tester can sign off the new structured sidebar layout separately from the underlying gameplay systems."
+                }
+            ],
+            "next_step_suggestions": [
+                "Tester: verify `BUG-010`, `OBJ-011`, and `OBJ-012` together in the playable build. Confirm corruption seeders now start lighter and darken toward release, the pulse-on-seed still fires, and the sidebar keeps status visible while contextual controls remain reachable and utility actions stay visually separate.",
+                "Reviewer: inspect the sidebar refactor as a structural change rather than a cosmetic reorder. The important checks are that the action region now swaps by selection state and that utility controls no longer share the main gameplay stack.",
+                "Tester/Reviewer: `python -m pytest tests/test_simulation.py` passed on March 25, 2026 with 17 tests passing; only pytest cache warnings were emitted because local cache writes are restricted.",
+                "Tester: a live Tk probe in this environment confirmed the new layout and telegraph direction: `build_group_manager=pack`, `tower_group_after_build=pack`, `seed_group_after_build=pack`, `utility_new_game=True`, `seeder_light=#D79BA3`, `seeder_dark=#78444B`."
+            ]
+        },
+        {
+            "entry_id": "tester-20260325-006",
+            "agent": "Tester",
+            "timestamp": "2026-03-25T16:24:10.9176787-06:00",
+            "status": "partial",
+            "looked_at": [
+                "agent_log.json",
+                "QA_TRACKER.md",
+                "Game_Design.md",
+                "gridline/app.py",
+                "tests/test_simulation.py",
+                "coder-20260325-006"
+            ],
+            "intent": [
+                "Take the newest tester handoff from the coder's telegraph/layout pass instead of leaving `BUG-010`, `OBJ-011`, and `OBJ-012` in verify state.",
+                "Confirm the corrected seeder telegraph direction, the structured sidebar layout behavior, and the strengthened regression suite against the current workspace."
+            ],
+            "updates_made": [
+                {
+                    "file": "QA_TRACKER.md",
+                    "change_type": "updated",
+                    "summary": "Marked `BUG-010`, `OBJ-011`, and `OBJ-012` pass after verifying lighter-to-darker seeder telegraph progression, utility/control-region separation, contextual action swapping, and passing 17-test regression coverage."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Recorded tester verification that corruption seeders now start lighter and darken toward release, the sidebar uses separate utility and contextual action regions with scroll support, and `python -m pytest tests/test_simulation.py` passed with 17 tests."
+                }
+            ],
+            "next_step_suggestions": [
+                "Tester: focus remaining live-play verification on the older unresolved gameplay items only: `OBJ-005`, `OBJ-006`, `OBJ-007`, `OBJ-008`, `BUG-004`, `BUG-007`, and `BUG-008`.",
+                "Reviewer: no new blocker was found in the sidebar/telegraph pass. Shift review attention back to the remaining simulation-behavior risk areas, especially spread arbitration robustness and Focus-mode behavior under live movement.",
+                "Coder: no immediate follow-up is required from this tester pass. Re-open the sidebar or telegraph work only if later live-play QA finds readability issues that the current helper-level and UI-structure checks did not expose.",
+                "Tester/Reviewer: `python -m pytest tests/test_simulation.py` passed on March 25, 2026 with 17 tests passing; only pytest cache warnings were emitted because local cache writes are restricted."
             ]
         }
     ]

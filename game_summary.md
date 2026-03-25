@@ -16,7 +16,7 @@
 1. Initialize windowed display (with fullscreen toggle), grid, sidebar UI, glow surface.
 2. Spawn enemies continuously with randomized timing.
 3. Increase enemy pressure by level over time (primarily spawn count/rate scaling).
-4. Spend coins to build and activate towers.
+4. Spend coins to build towers on predefined hardpoints.
 5. Towers fire automatically at a fire rate that can be upgraded, and each shot has a cost.
 6. Snakes move along a random grid walk and clean corruption.
 7. Balance expansion and per-shot firing costs against corruption and enemy pressure to survive as long as possible.
@@ -28,6 +28,8 @@
 - Three grid layers:
   - Large (brightest and boldest), medium (half), small (quarter).
 - Orb tails have a fade from head to tail, with glow.
+- Orb tails must stay confined to valid grid lines and follow the orb's exact traveled path rather than cutting across cells or using a simplified straight-line approximation.
+- Tail visibility should fade progressively from the orb head backward so the oldest portion of the tail is the faintest.
 - Map playfield should dynamically scale to fill available screen space (minus UI rail) in both windowed and fullscreen.
 - Visual style target remains the provided `Style Example.jpg`: dark technical look, subtle glow, meaningful transparency, and shadowing.
 - Grid density/scale is configurable; current direction is to run at half the prior effective grid scale for denser line detail.
@@ -36,7 +38,8 @@
 
 ## Towers
 - Towers use predefined edge hardpoints on the map (not free placement anywhere).
-- Each hardpoint can be activated by the player for a coin cost.
+- Hardpoints do not require a separate activation purchase before building.
+- If a hardpoint is empty and the player can afford a tower, the player can build directly on that site.
 - Tower sell/scrap is not part of MVP.
 - MVP includes at least 3 tower archetypes.
 - Tower roles vary by design (some stronger at cleaning, others stronger at enemy damage).
@@ -73,7 +76,7 @@
 
 ## Economy
 - Start with coins.
-- Costs to build and activate towers.
+- Costs to build towers.
 - Towers use per-shot cost (no passive continuous operating drain).
 - Costs to upgrade towers (upgrades affect all current and future towers).
 - Core strategic tension: survive longer by balancing income and per-shot firing spend.
@@ -114,11 +117,13 @@
   - Green: harvestable for money; can spread and increase in intensity.
   - Red: corruption; can spread and increase in intensity.
 - Both green and red have multiple growth levels.
+- Both green and red should use light-to-dark intensity coloring so the player can read at a glance how dense/strong that line state currently is.
 - Redder lines require more orb passes to clear.
 - Clearing red lines converts them to blue.
 - Harvesting/clearing green lines converts them to blue.
 - If green and red compete for the same line at the same time, they cancel out and the line remains its current color state.
 - Red/green spread should execute across all grid tiers (`large`, `medium`, `small`) with explicit tier-aware spread passes (configurable profile/weights).
+- Orb interaction must cause a noticeable visual step on affected lines so the player can immediately see what the orb accomplished. For MVP clarity, an orb pass should visibly knock a corrupted or green line down by one visible color/intensity level whenever progress is meaningfully applied.
 
 ## Enemy Pressure Model
 - Enemies apply mixed pressure:
@@ -127,6 +132,8 @@
 - Enemy behavior variety is a key design lever for difficulty.
 - If enemies destroy player structures, towers are lost and must be rebuilt/reactivated.
 - Enemies must travel only on valid grid lines/intersections (no free-space diagonal movement through cells).
+- Enemies that are about to create corruption should communicate that clearly through color and/or burst feedback before the corruption event resolves.
+- Default enemy readability direction: start at a lighter red and darken as they approach corruption release, with an additional brief burst/pulse visual when corruption is actually seeded.
 - If a `Tower Striker` has no valid tower target, it should fall back to a corruption-pressure behavior rather than idling: route toward a valid interior line target and create a red corruption source on arrival.
 - Tower Striker fallback target priority should be deterministic and pressure-oriented:
   - Prefer non-red interior lines over already-red lines.
@@ -145,6 +152,7 @@
   - optional "until exit"
 - Orb entity can expire by lifetime or when trail ends.
 - Tail length is per tower (`snake_tail_length`).
+- Tail rendering should be derived from the orb's real movement history along connected segments so the visible tail matches the exact route recently traveled.
 
 ## Controls
 - Esc: quit
@@ -157,6 +165,22 @@
   - selected tower readiness/cooldown indicator
 - For the first playable MVP build, keep these telemetry items visible by default rather than hiding them behind a debug toggle.
 - If the project later separates shipping HUD from debug HUD, always-visible HUD items should remain: coins, corruption percentage/failure context, surge state, selected tower readiness/cooldown, and power tower funding/charge status.
+
+## UI Layout Direction
+- The right-side UI should behave like a structured control panel, not a single long stack of buttons and text.
+- Core run status and selected-object details should remain visible without pushing important actions off-screen.
+- The sidebar should support sectioning and overflow management so selecting a tower or hardpoint never makes controls unreachable.
+- Preferred layout direction:
+  - Persistent top status area for run-critical information.
+  - Selected-object details in a dedicated panel beneath status.
+  - Context-sensitive action area beneath details for build, upgrade, mode, and seed-targeting controls.
+  - Separate utility/menu area for low-frequency actions such as `New Game`, rather than mixing them into the main tower-control stack.
+- The main action area should be scrollable or paged if needed, but the design should avoid forcing the player to hunt through an unstructured button column.
+- Build controls should appear when an empty hardpoint is selected.
+- Tower management controls should appear when a tower is selected.
+- Power-tower and utility controls should be visually separated from tower-specific controls.
+- The UI should feel sleek and technical: compact, readable, and deliberate, with clear grouping and hierarchy rather than raw button accumulation.
+- High-frequency gameplay controls should be prioritized for immediate visibility; low-frequency controls should be moved to a quieter menu/utility region.
 
 ## Waves and Milestones
 - Milestone waves/events are not required for MVP.

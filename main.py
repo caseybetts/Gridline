@@ -1,5 +1,5 @@
-from gridline.game import main
+from gridline.app import GridlineApp
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    GridlineApp().run()

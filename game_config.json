@@ -10,7 +10,9 @@
       "background": [4, 7, 13],
       "panel": [10, 14, 22],
       "text": [204, 214, 228],
-      "grid_blue": [48, 78, 126],
+      "grid_blue_large": [127, 199, 255],
+      "grid_blue_medium": [78, 160, 216],
+      "grid_blue_small": [42, 89, 120],
       "grid_green": [88, 190, 148],
       "grid_red": [186, 82, 96],
       "tower_active": [164, 176, 196],
@@ -20,8 +22,8 @@
       "orb_trail": [178, 212, 232]
     },
     "grid_layer_width_by_tier": {
-      "large": 2,
-      "medium": 1,
+      "large": 3,
+      "medium": 2,
       "small": 1
     },
     "grid_layer_glow_alpha_by_tier": {
@@ -45,12 +47,11 @@
     "target_minutes_min": 10,
     "target_minutes_max": 15,
     "corruption_loss_threshold_percent": 80,
-    "level_up_interval_seconds": 60
+    "level_up_interval_seconds": 45
   },
   "tower_placement": {
     "mode": "edge_hardpoints",
-    "hardpoint_count": 8,
-    "activation_cost_by_slot": [30, 40, 50, 65, 80, 100, 125, 150]
+    "hardpoint_count": 12
   },
   "grid": {
     "map_count": 1,
@@ -61,9 +62,9 @@
     "green_to_blue_passes_by_intensity": [1, 1, 2]
   },
   "economy": {
-    "starting_coins": 2000,
+    "starting_coins": 220,
     "enemy_kill_income_enabled": false,
-    "green_harvest_income_by_intensity": [1, 2, 4],
+    "green_harvest_income_by_intensity": [4, 8, 14],
     "early_game_forgiving": true
   },
   "upgrades": {
@@ -77,32 +78,32 @@
       "display_name": "Basic Tower",
       "role": "balanced",
       "emission_mode": "spawn_at_tower",
-      "build_cost": 60,
-      "shot_cost": 1,
-      "base_fire_rate": 1.4,
-      "base_hit_damage": 5,
-      "base_snake_speed": 1.0,
+      "build_cost": 55,
+      "shot_cost": 2,
+      "base_fire_rate": 1.25,
+      "base_hit_damage": 10,
+      "base_snake_speed": 500,
       "base_shot_range": 0,
-      "base_hp": 100,
-      "snake_tail_length": 12,
+      "base_hp": 120,
+      "snake_tail_length": 70,
       "grid_access_start": "large",
       "grid_access_max": "small",
       "path_behavior": "mostly_straight",
-      "orb_lifetime_seconds": 4.0
+      "orb_lifetime_seconds": 3.2
     },
     {
       "id": "seed_tower",
       "display_name": "Seed Tower",
       "role": "cleaning_focus",
       "emission_mode": "projectile_seed",
-      "build_cost": 90,
-      "shot_cost": 2,
-      "base_fire_rate": 0.8,
-      "base_hit_damage": 4,
-      "base_snake_speed": 1.1,
-      "base_shot_range": 14,
-      "base_hp": 90,
-      "snake_tail_length": 16,
+      "build_cost": 75,
+      "shot_cost": 4,
+      "base_fire_rate": 0.65,
+      "base_hit_damage": 8,
+      "base_snake_speed": 88,
+      "base_shot_range": 340,
+      "base_hp": 95,
+      "snake_tail_length": 82,
       "grid_access_start": "large",
       "grid_access_max": "small",
       "path_behavior": "random_walk",
@@ -111,21 +112,21 @@
         "red_vs_green_percent": 70,
         "darkest_vs_random_percent": 60
       },
-      "orb_lifetime_seconds": 5.0
+      "orb_lifetime_seconds": 3.8
     },
     {
       "id": "burst_tower",
       "display_name": "Burst Tower",
       "role": "damage_focus",
       "emission_mode": "spawn_at_tower",
-      "build_cost": 120,
-      "shot_cost": 4,
-      "base_fire_rate": 0.5,
+      "build_cost": 70,
+      "shot_cost": 5,
+      "base_fire_rate": 0.9,
       "base_hit_damage": 7,
-      "base_snake_speed": 1.3,
+      "base_snake_speed": 92,
       "base_shot_range": 0,
-      "base_hp": 110,
-      "snake_tail_length": 10,
+      "base_hp": 105,
+      "snake_tail_length": 52,
       "grid_access_start": "large",
       "grid_access_max": "small",
       "path_behavior": "high_random_short_life",
@@ -135,7 +136,7 @@
   ],
   "corruption": {
     "spread_algorithm": "adjacent_outward_growth",
-    "base_spread_interval_seconds": 1.2,
+    "base_spread_interval_seconds": 5,
     "enemy_can_seed_new_sites": true,
     "enemy_can_boost_spread_speed": true,
     "spread_profile_by_tier": {

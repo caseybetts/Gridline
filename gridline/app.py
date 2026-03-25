@@ -1,0 +1,595 @@
+from __future__ import annotations
+
+from dataclasses import replace
+import tkinter as tk
+
+from .simulation import GameSimulation, Orb
+from .spec import GameSpec, load_game_spec
+from .topology import Topology
+
+
+def segment_position(topology: Topology, segment_id: str, from_node_id: str, distance: float) -> tuple[float, float]:
+    segment = topology.segments[segment_id]
+    a = topology.nodes[segment.a]
+    b = topology.nodes[segment.b]
+    length = max(1.0, segment.length)
+    t = min(1.0, max(0.0, distance / length))
+    if from_node_id == segment.a:
+        return (a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)
+    return (b.x + (a.x - b.x) * t, b.y + (a.y - b.y) * t)
+
+
+def build_orb_trail_points(topology: Topology, orb: Orb, trail_length: float) -> list[tuple[float, float]]:
+    head = segment_position(topology, orb.segment_id, orb.from_node, orb.distance_on_segment)
+    if trail_length <= 0:
+        return [head]
+
+    points = [head]
+    remaining = trail_length
+    current_distance = max(0.0, orb.distance_on_segment)
+    current_node_id = orb.from_node
+    current_node = topology.nodes[current_node_id]
+
+    if current_distance > 0:
+        if current_distance >= remaining:
+            progress = remaining / current_distance
+            points.append(
+                (
+                    head[0] + (current_node.x - head[0]) * progress,
+                    head[1] + (current_node.y - head[1]) * progress,
+                )
+            )
+            return _dedupe_points(points)
+        points.append((current_node.x, current_node.y))
+        remaining -= current_distance
+
+    history = list(orb.trail_nodes)
+    if not history and orb.previous_node is not None:
+        history = [orb.previous_node]
+
+    for previous_node_id in history:
+        previous_segment_id = _segment_between(topology, current_node_id, previous_node_id)
+        if previous_segment_id is None:
+            break
+        previous_segment = topology.segments[previous_segment_id]
+        previous_node = topology.nodes[previous_node_id]
+        backtrack = min(remaining, previous_segment.length)
+        progress = backtrack / max(1.0, previous_segment.length)
+        points.append(
+            (
+                current_node.x + (previous_node.x - current_node.x) * progress,
+                current_node.y + (previous_node.y - current_node.y) * progress,
+            )
+        )
+        remaining -= backtrack
+        if remaining <= 0:
+            break
+        current_node_id = previous_node_id
+        current_node = previous_node
+    return _dedupe_points(points)
+
+
+def _segment_between(topology: Topology, first_node_id: str, second_node_id: str) -> str | None:
+    for segment_id in topology.adjacency.get(first_node_id, ()):
+        segment = topology.segments[segment_id]
+        if segment.a == second_node_id or segment.b == second_node_id:
+            return segment_id
+    return None
+
+
+def _dedupe_points(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    deduped: list[tuple[float, float]] = []
+    for point in points:
+        if not deduped or deduped[-1] != point:
+            deduped.append(point)
+    return deduped
+
+
+def build_faded_trail_segments(points: list[tuple[float, float]], segment_length: float = 14.0) -> list[tuple[tuple[float, float], tuple[float, float], float]]:
+    if len(points) < 2:
+        return []
+    sampled = [points[0]]
+    remaining = segment_length
+    current = points[0]
+    for point in points[1:]:
+        start = current
+        end = point
+        dx = end[0] - start[0]
+        dy = end[1] - start[1]
+        distance = ((dx * dx) + (dy * dy)) ** 0.5
+        if distance <= 0:
+            current = end
+            continue
+        traveled = 0.0
+        while traveled + remaining < distance:
+            ratio = (traveled + remaining) / distance
+            sampled.append((start[0] + dx * ratio, start[1] + dy * ratio))
+            traveled += remaining
+            remaining = segment_length
+        remaining -= distance - traveled
+        current = end
+        if remaining <= 0.001:
+            sampled.append(end)
+            remaining = segment_length
+    if sampled[-1] != points[-1]:
+        sampled.append(points[-1])
+    segment_count = max(1, len(sampled) - 1)
+    return [
+        (sampled[index], sampled[index + 1], 1.0 - (index / segment_count))
+        for index in range(segment_count)
+    ]
+
+
+def blend_hex(color: str, target: str, amount: float) -> str:
+    amount = min(1.0, max(0.0, amount))
+    color_channels = [int(color[index:index + 2], 16) for index in (1, 3, 5)]
+    target_channels = [int(target[index:index + 2], 16) for index in (1, 3, 5)]
+    blended = [
+        round(target_channel + (color_channel - target_channel) * amount)
+        for color_channel, target_channel in zip(color_channels, target_channels)
+    ]
+    return "#{:02X}{:02X}{:02X}".format(*blended)
+
+
+def enemy_render_color(app: "GridlineApp", enemy) -> str:
+    if enemy.enemy_type != "corruption_seeder":
+        return app.spec.visuals.enemy_striker
+    budget = max(1, enemy.initial_path_budget)
+    progress = 1.0 - (enemy.path_budget_remaining / budget)
+    return blend_hex(app.spec.visuals.red_levels[2], app.spec.visuals.red_levels[0], progress)
+
+
+class GridlineApp:
+    def __init__(self, spec: GameSpec | None = None) -> None:
+        self.spec = spec or load_game_spec()
+        self.root = tk.Tk()
+        self.root.title("Gridline MVP")
+        self.root.geometry(f"{self.spec.width}x{self.spec.height}")
+        self.root.configure(bg=self.spec.visuals.background)
+        self.fullscreen = False
+
+        self.main_frame = tk.Frame(self.root, bg=self.spec.visuals.background)
+        self.main_frame.pack(fill=tk.BOTH, expand=True)
+        self.canvas = tk.Canvas(
+            self.main_frame,
+            bg=self.spec.visuals.background,
+            highlightthickness=0,
+            width=self.spec.width - self.spec.visuals.sidebar_width,
+            height=self.spec.height,
+        )
+        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.sidebar = tk.Frame(self.main_frame, bg=self.spec.visuals.sidebar, width=self.spec.visuals.sidebar_width)
+        self.sidebar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.sidebar.pack_propagate(False)
+
+        self.status_text = tk.StringVar()
+        self.detail_text = tk.StringVar()
+        self.feedback_text = tk.StringVar()
+        self.upgrade_text = tk.StringVar()
+        self.action_buttons: dict[str, tk.Button] = {}
+        self.utility_buttons: dict[str, tk.Button] = {}
+        self.action_groups: dict[str, tk.Frame] = {}
+        self.action_group_keys: dict[str, list[str]] = {}
+        self._build_sidebar()
+        self.canvas.bind("<Button-1>", self._on_canvas_click)
+        self.root.bind("<Escape>", lambda _event: self.root.destroy())
+        self.root.bind("<F11>", self._toggle_fullscreen)
+        self.tick_ms = int(1000 / self.spec.simulation_tick_rate)
+        self.loop_running = False
+        self.root.update_idletasks()
+        self.sim = GameSimulation(self._runtime_spec_for_canvas())
+
+    def _build_sidebar(self) -> None:
+        label_style = {
+            "bg": self.spec.visuals.sidebar,
+            "fg": self.spec.visuals.text,
+            "anchor": "w",
+            "justify": "left",
+        }
+        tk.Label(self.sidebar, text="Gridline", font=("Consolas", 18, "bold"), **label_style).pack(fill=tk.X, padx=16, pady=(16, 8))
+
+        status_frame = tk.Frame(self.sidebar, bg=self.spec.visuals.sidebar)
+        status_frame.pack(fill=tk.X, padx=16, pady=(0, 8))
+        self._section_label(status_frame, "Run Status").pack(fill=tk.X, pady=(0, 4))
+        tk.Label(status_frame, textvariable=self.status_text, font=("Consolas", 11), **label_style).pack(fill=tk.X)
+
+        details_frame = tk.Frame(self.sidebar, bg=self.spec.visuals.sidebar)
+        details_frame.pack(fill=tk.X, padx=16, pady=(0, 8))
+        self._section_label(details_frame, "Selection").pack(fill=tk.X, pady=(0, 4))
+        tk.Label(
+            details_frame,
+            textvariable=self.detail_text,
+            font=("Consolas", 10),
+            wraplength=self.spec.visuals.sidebar_width - 32,
+            **label_style,
+        ).pack(fill=tk.X)
+        tk.Label(
+            details_frame,
+            textvariable=self.feedback_text,
+            font=("Consolas", 10),
+            wraplength=self.spec.visuals.sidebar_width - 32,
+            fg="#F2C46D",
+            bg=self.spec.visuals.sidebar,
+            anchor="w",
+            justify="left",
+        ).pack(fill=tk.X, pady=(6, 0))
+        tk.Label(
+            details_frame,
+            textvariable=self.upgrade_text,
+            font=("Consolas", 9),
+            wraplength=self.spec.visuals.sidebar_width - 32,
+            **label_style,
+        ).pack(fill=tk.X, pady=(6, 0))
+
+        actions_shell = tk.Frame(self.sidebar, bg=self.spec.visuals.sidebar)
+        actions_shell.pack(fill=tk.BOTH, expand=True, padx=16, pady=(0, 8))
+        self._section_label(actions_shell, "Actions").pack(fill=tk.X, pady=(0, 4))
+        self.action_canvas = tk.Canvas(actions_shell, bg=self.spec.visuals.sidebar, highlightthickness=0, bd=0)
+        self.action_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.action_scrollbar = tk.Scrollbar(actions_shell, orient=tk.VERTICAL, command=self.action_canvas.yview)
+        self.action_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.action_canvas.configure(yscrollcommand=self.action_scrollbar.set)
+        self.action_inner = tk.Frame(self.action_canvas, bg=self.spec.visuals.sidebar)
+        self.action_canvas_window = self.action_canvas.create_window((0, 0), window=self.action_inner, anchor="nw")
+        self.action_inner.bind("<Configure>", self._sync_action_scrollregion)
+        self.action_canvas.bind("<Configure>", self._sync_action_canvas_width)
+
+        self._build_action_group(
+            "build",
+            "Build",
+            [
+                ("build_basic_tower", "Build Basic", lambda: self.sim.build_tower("basic_tower")),
+                ("build_seed_tower", "Build Seed", lambda: self.sim.build_tower("seed_tower")),
+                ("build_burst_tower", "Build Burst", lambda: self.sim.build_tower("burst_tower")),
+            ],
+        )
+        self._build_action_group(
+            "tower",
+            "Tower Controls",
+            [
+                ("buy_secondary", "Buy Secondary", lambda: self.sim.purchase_secondary_mode()),
+                ("swap_mode", "Swap Mode", lambda: self.sim.toggle_selected_mode()),
+                ("upgrade_fire_rate", "Upgrade Fire Rate", lambda: self.sim.upgrade_selected_tower_type("fire_rate")),
+                ("upgrade_hp", "Upgrade HP", lambda: self.sim.upgrade_selected_tower_type("hp")),
+                ("upgrade_snake_speed", "Upgrade Snake Speed", lambda: self.sim.upgrade_selected_tower_type("snake_speed")),
+                ("upgrade_hit_damage", "Upgrade Damage", lambda: self.sim.upgrade_selected_tower_type("hit_damage")),
+                ("upgrade_shot_range", "Upgrade Shot Range", lambda: self.sim.upgrade_selected_tower_type("shot_range")),
+                ("upgrade_grid_access_tier", "Upgrade Tier", lambda: self.sim.upgrade_selected_tower_type("grid_access_tier")),
+            ],
+        )
+        self._build_action_group(
+            "seed",
+            "Seed Levers",
+            [
+                ("seed_closest_plus", "Seed Closest +5", lambda: self.sim.adjust_seed_lever("closest", 5)),
+                ("seed_closest_minus", "Seed Closest -5", lambda: self.sim.adjust_seed_lever("closest", -5)),
+                ("seed_color_plus", "Seed Red +5", lambda: self.sim.adjust_seed_lever("color", 5)),
+                ("seed_color_minus", "Seed Red -5", lambda: self.sim.adjust_seed_lever("color", -5)),
+                ("seed_darkest_plus", "Seed Darkest +5", lambda: self.sim.adjust_seed_lever("darkest", 5)),
+                ("seed_darkest_minus", "Seed Darkest -5", lambda: self.sim.adjust_seed_lever("darkest", -5)),
+            ],
+        )
+        self._build_action_group(
+            "power",
+            "Power",
+            [
+                ("fund_power", "Fund Power +10%", lambda: self.sim.fund_power()),
+                ("deploy_power", "Deploy Power", lambda: self.sim.deploy_power_to_selected()),
+            ],
+        )
+
+        utility_frame = tk.Frame(self.sidebar, bg=self.spec.visuals.sidebar)
+        utility_frame.pack(fill=tk.X, padx=16, pady=(0, 16))
+        self._section_label(utility_frame, "Menu").pack(fill=tk.X, pady=(0, 4))
+        new_game_button = self._make_button(utility_frame, "new_game", "New Game", self._new_game)
+        new_game_button.pack(fill=tk.X, pady=3)
+        self.utility_buttons["new_game"] = new_game_button
+
+    def _run_action(self, key: str, command) -> None:
+        availability = self.sim.action_availability()
+        if key in availability and not availability[key][0]:
+            self.feedback_text.set(availability[key][1])
+            self._refresh_sidebar()
+            return
+        command()
+        self.feedback_text.set("")
+        self._refresh_sidebar()
+
+    def _build_action_group(self, group_key: str, title: str, actions: list[tuple[str, str, object]]) -> None:
+        group_frame = tk.Frame(self.action_inner, bg=self.spec.visuals.sidebar)
+        self._section_label(group_frame, title).pack(fill=tk.X, pady=(0, 4))
+        keys: list[str] = []
+        for key, label, command in actions:
+            button = self._make_button(group_frame, key, label, command)
+            button.pack(fill=tk.X, pady=3)
+            self.action_buttons[key] = button
+            keys.append(key)
+        self.action_groups[group_key] = group_frame
+        self.action_group_keys[group_key] = keys
+
+    def _make_button(self, parent: tk.Widget, key: str, label: str, command) -> tk.Button:
+        return tk.Button(
+            parent,
+            text=label,
+            command=lambda key=key, command=command: self._run_action(key, command),
+            bg="#132235",
+            fg=self.spec.visuals.text,
+            activebackground="#1C3654",
+            activeforeground=self.spec.visuals.text,
+            relief=tk.FLAT,
+            disabledforeground="#6F8195",
+        )
+
+    def _section_label(self, parent: tk.Widget, text: str) -> tk.Label:
+        return tk.Label(
+            parent,
+            text=text,
+            font=("Consolas", 10, "bold"),
+            bg=self.spec.visuals.sidebar,
+            fg=self.spec.visuals.muted_text,
+            anchor="w",
+            justify="left",
+        )
+
+    def _sync_action_scrollregion(self, _event=None) -> None:
+        self.action_canvas.configure(scrollregion=self.action_canvas.bbox("all"))
+
+    def _sync_action_canvas_width(self, event) -> None:
+        self.action_canvas.itemconfigure(self.action_canvas_window, width=event.width)
+
+    def _toggle_fullscreen(self, _event=None) -> None:
+        if not self.spec.fullscreen_toggle_enabled:
+            return
+        self.fullscreen = not self.fullscreen
+        self.root.attributes("-fullscreen", self.fullscreen)
+
+    def _on_canvas_click(self, event) -> None:
+        self.sim.click_world(event.x, event.y)
+        self._refresh_sidebar()
+
+    def _new_game(self) -> None:
+        should_restart_loop = not self.loop_running or self.sim.game_over
+        self.root.update_idletasks()
+        self.sim = GameSimulation(self._runtime_spec_for_canvas())
+        self._render()
+        self._refresh_sidebar()
+        if should_restart_loop:
+            self._loop()
+
+    def run(self) -> None:
+        self._loop()
+        self.root.mainloop()
+
+    def _loop(self) -> None:
+        self.loop_running = True
+        self.sim.update(1.0 / self.spec.simulation_tick_rate)
+        self._render()
+        self._refresh_sidebar()
+        if not self.sim.game_over:
+            self.root.after(self.tick_ms, self._loop)
+        else:
+            self.loop_running = False
+
+    def _refresh_sidebar(self) -> None:
+        hud = self.sim.hud_snapshot()
+        self.status_text.set(
+            "\n".join(
+                [
+                    f"Coins: {hud['coins']}",
+                    f"Corruption: {hud['corruption_percent']:.1f}% / {hud['failure_threshold']:.0f}%",
+                    f"Level: {hud['level']}  Next: {hud['level_time_remaining']:.1f}s",
+                    f"Orbs: {hud['active_orb_count']}  Shots/s: {hud['shots_recent']}",
+                    f"Power: {hud['power_percent']}%{' READY' if hud['power_charged'] else ''}",
+                    f"Surge: {'ACTIVE' if hud['surge_active'] else 'idle'}",
+                    "Status: GAME OVER" if hud["game_over"] else "Status: running",
+                ]
+            )
+        )
+        hardpoint = self.sim.selected_hardpoint()
+        if hardpoint is None:
+            self.detail_text.set("Select a hardpoint on the perimeter to build, upgrade, or deploy power.")
+            self.upgrade_text.set("")
+            self._update_button_states(hud["selected_object"], hud["action_availability"])
+            return
+        selected = hud["selected_object"]
+        lines = [f"Selected: {hardpoint.hardpoint.key} ({hardpoint.hardpoint.side})"]
+        if selected["kind"] == "power":
+            fire_text = "READY" if selected["fire_ready"] else f"{selected['fire_cooldown']:.1f}s"
+            lines.extend(
+                [
+                    f"State: {selected['name']}",
+                    f"HP: {selected['hp']:.0f}/{selected['max_hp']:.0f}",
+                    f"Fire: {fire_text}",
+                    f"Time Left: {selected['time_remaining']:.1f}s",
+                    f"Suspended Tower: {selected['underlying_tower_name'] or 'none'}",
+                ]
+            )
+        elif selected["kind"] == "tower":
+            tower = selected["tower"]
+            fire_text = "READY" if selected["fire_ready"] else f"{selected['fire_cooldown']:.1f}s"
+            lines.extend(
+                [
+                    f"Tower: {selected['name']}",
+                    f"HP: {selected['hp']:.0f}/{selected['max_hp']:.0f}",
+                    f"Mode: {selected['mode']}",
+                    f"Fire: {fire_text}",
+                    f"Secondary unlocked: {selected['secondary_unlocked']}",
+                    f"Swap cooldown: {selected['swap_cooldown']:.1f}s",
+                ]
+            )
+            if tower.archetype == "seed_tower":
+                lines.extend(
+                    [
+                        f"Closest/Random: {tower.seed_closest_vs_random}/{100 - tower.seed_closest_vs_random}",
+                        f"Red/Green: {tower.seed_red_vs_green}/{100 - tower.seed_red_vs_green}",
+                        f"Darkest/Random: {tower.seed_darkest_vs_random}/{100 - tower.seed_darkest_vs_random}",
+                    ]
+                )
+        else:
+            lines.append("Tower: empty")
+        self.detail_text.set("\n".join(lines))
+        self.upgrade_text.set("\n".join(hud["upgrade_preview"]))
+        self._update_button_states(hud["selected_object"], hud["action_availability"])
+
+    def _update_button_states(self, selected: dict[str, object], availability: dict[str, tuple[bool, str]]) -> None:
+        context = selected.get("kind", "none")
+        visible_groups = ["power"]
+        if context in {"none", "empty"}:
+            visible_groups.insert(0, "build")
+        elif context == "tower":
+            visible_groups = ["tower", "seed", "power"]
+        elif context == "power":
+            visible_groups = ["power"]
+
+        for group_key, group_frame in self.action_groups.items():
+            if group_key == "seed":
+                tower = selected.get("tower")
+                should_show = context == "tower" and tower is not None and tower.archetype == "seed_tower"
+            else:
+                should_show = group_key in visible_groups
+            if should_show:
+                if not group_frame.winfo_ismapped():
+                    group_frame.pack(fill=tk.X, pady=(0, 10))
+            elif group_frame.winfo_ismapped():
+                group_frame.pack_forget()
+
+        for key, button in self.action_buttons.items():
+            enabled, _reason = availability.get(key, (True, ""))
+            button.configure(state=tk.NORMAL if enabled else tk.DISABLED)
+        for button in self.utility_buttons.values():
+            button.configure(state=tk.NORMAL)
+
+    def _render(self) -> None:
+        self.canvas.delete("all")
+        self.canvas.create_rectangle(0, 0, self.canvas.winfo_width(), self.canvas.winfo_height(), fill=self.spec.visuals.playfield_overlay, outline="")
+        for segment_id, segment in self.sim.topology.segments.items():
+            state = self.sim.segment_states[segment_id]
+            a = self.sim.topology.nodes[segment.a]
+            b = self.sim.topology.nodes[segment.b]
+            self.canvas.create_line(a.x, a.y, b.x, b.y, fill=self._segment_color(segment.tier, state.color, state.intensity), width={"large": self.spec.visuals.large_line_width, "medium": self.spec.visuals.medium_line_width, "small": self.spec.visuals.small_line_width}[segment.tier])
+            impact = self.sim.segment_impacts.get(segment_id)
+            if impact is not None:
+                effect_strength = impact.time_remaining / impact.duration if impact.duration > 0 else 0.0
+                flash_color = self._impact_color(impact.color, impact.intensity, effect_strength)
+                self.canvas.create_line(
+                    a.x,
+                    a.y,
+                    b.x,
+                    b.y,
+                    fill=flash_color,
+                    width={"large": self.spec.visuals.large_line_width, "medium": self.spec.visuals.medium_line_width, "small": self.spec.visuals.small_line_width}[segment.tier] + 2.0 * effect_strength,
+                )
+
+        for hardpoint_state in self.sim.hardpoints.values():
+            node = self.sim.topology.nodes[hardpoint_state.hardpoint.node_id]
+            fill = "#1B3145" if hardpoint_state.tower is not None else "#10202F"
+            outline = "#8BD3FF" if self.sim.selected_hardpoint_id == hardpoint_state.hardpoint.key else "#30506B"
+            self.canvas.create_oval(node.x - self.spec.visuals.hardpoint_radius, node.y - self.spec.visuals.hardpoint_radius, node.x + self.spec.visuals.hardpoint_radius, node.y + self.spec.visuals.hardpoint_radius, fill=fill, outline=outline, width=2)
+            if hardpoint_state.tower is not None:
+                color = {"basic_tower": "#A8B9CC", "seed_tower": "#9DE0B1", "burst_tower": "#FFD08A"}[hardpoint_state.tower.archetype]
+                self.canvas.create_oval(node.x - 5, node.y - 5, node.x + 5, node.y + 5, fill=color, outline="")
+            if self.sim.power.active_hardpoint_id == hardpoint_state.hardpoint.key:
+                self.canvas.create_oval(node.x - 14, node.y - 14, node.x + 14, node.y + 14, outline="#FCEB8B", width=2)
+
+        for orb in self.sim.orbs.values():
+            trail_points = build_orb_trail_points(self.sim.topology, orb, self._orb_trail_length(orb))
+            for start, end, intensity in build_faded_trail_segments(trail_points):
+                glow_color = blend_hex(self.spec.visuals.orb_head, self.spec.visuals.playfield_overlay, 0.18 + intensity * 0.45)
+                trail_color = blend_hex(self.spec.visuals.orb_trail, self.spec.visuals.playfield_overlay, 0.08 + intensity * 0.72)
+                self.canvas.create_line(
+                    start[0],
+                    start[1],
+                    end[0],
+                    end[1],
+                    fill=glow_color,
+                    width=self.spec.visuals.orb_trail_width * (1.2 + intensity * 0.9),
+                    capstyle=tk.ROUND,
+                )
+                self.canvas.create_line(
+                    start[0],
+                    start[1],
+                    end[0],
+                    end[1],
+                    fill=trail_color,
+                    width=self.spec.visuals.orb_trail_width * (0.65 + intensity * 0.35),
+                    capstyle=tk.ROUND,
+                )
+            x, y = trail_points[0]
+            glow_radius = self.spec.visuals.orb_head_radius * 1.8
+            self.canvas.create_oval(
+                x - glow_radius,
+                y - glow_radius,
+                x + glow_radius,
+                y + glow_radius,
+                fill=self.spec.visuals.orb_trail,
+                outline="",
+            )
+            self.canvas.create_oval(x - self.spec.visuals.orb_head_radius, y - self.spec.visuals.orb_head_radius, x + self.spec.visuals.orb_head_radius, y + self.spec.visuals.orb_head_radius, fill=self.spec.visuals.orb_head, outline="")
+
+        for flight in self.sim.seed_flights.values():
+            x, y = self._seed_flight_position(flight)
+            self.canvas.create_oval(x - 4, y - 4, x + 4, y + 4, fill="#F4E7A1", outline="")
+
+        for enemy in self.sim.enemies.values():
+            x, y = self._segment_position(enemy.segment_id, enemy.from_node, enemy.distance_on_segment)
+            color = enemy_render_color(self, enemy)
+            self.canvas.create_oval(x - self.spec.visuals.enemy_radius, y - self.spec.visuals.enemy_radius, x + self.spec.visuals.enemy_radius, y + self.spec.visuals.enemy_radius, fill=color, outline="")
+
+        for pulse in self.sim.seed_pulses:
+            node = self.sim.topology.nodes[pulse.node_id]
+            progress = 1.0 - (pulse.time_remaining / pulse.duration if pulse.duration > 0 else 1.0)
+            radius = 8.0 + progress * 18.0
+            color = blend_hex(self.spec.visuals.red_levels[1], self.spec.visuals.playfield_overlay, 0.9 - progress * 0.7)
+            self.canvas.create_oval(node.x - radius, node.y - radius, node.x + radius, node.y + radius, outline=color, width=max(1.0, 3.0 - progress * 2.0))
+
+        self.canvas.create_text(16, 16, anchor="nw", fill=self.spec.visuals.text, font=("Consolas", 12, "bold"), text=f"Coins {self.sim.coins}   Corruption {self.sim.corruption_percent():.1f}%   Orbs {len(self.sim.orbs)}   Enemies {len(self.sim.enemies)}")
+        if self.sim.surge_time_remaining > 0:
+            self.canvas.create_text(16, 36, anchor="nw", fill=self.spec.visuals.warning, font=("Consolas", 11, "bold"), text=f"SURGE ACTIVE {self.sim.surge_time_remaining:.1f}s")
+        if self.sim.game_over:
+            self.canvas.create_text(self.canvas.winfo_width() / 2, 36, fill=self.spec.visuals.critical, font=("Consolas", 16, "bold"), text="GRID FAILURE")
+
+    def _segment_position(self, segment_id: str, from_node_id: str, distance: float) -> tuple[float, float]:
+        return segment_position(self.sim.topology, segment_id, from_node_id, distance)
+
+    def _segment_color(self, tier: str, color: str, intensity: int) -> str:
+        if color == "red" and intensity > 0:
+            return self.spec.visuals.red_levels[intensity - 1]
+        if color == "green" and intensity > 0:
+            return self.spec.visuals.green_levels[intensity - 1]
+        return {"large": self.spec.visuals.neutral_large, "medium": self.spec.visuals.neutral_medium, "small": self.spec.visuals.neutral_small}[tier]
+
+    def _impact_color(self, color: str, intensity: int, effect_strength: float) -> str:
+        if color == "red" and intensity > 0:
+            base = self.spec.visuals.red_levels[max(0, intensity - 1)]
+        elif color == "green" and intensity > 0:
+            base = self.spec.visuals.green_levels[max(0, intensity - 1)]
+        else:
+            base = self.spec.visuals.orb_head
+        return blend_hex(base, self.spec.visuals.orb_head, min(1.0, 0.35 + effect_strength * 0.65))
+
+    def _seed_flight_position(self, flight) -> tuple[float, float]:
+        start = self.sim.topology.nodes[flight.start_node_id]
+        target = self.sim.topology.nodes[flight.target_node_id]
+        progress = 1.0 - (flight.time_remaining / flight.total_time if flight.total_time > 0 else 1.0)
+        progress = min(1.0, max(0.0, progress))
+        return (
+            start.x + (target.x - start.x) * progress,
+            start.y + (target.y - start.y) * progress,
+        )
+
+    def _orb_trail_length(self, orb: Orb) -> float:
+        if orb.owner_tower_id == "power_tower":
+            return self.spec.power_snake_tail_length
+        tower = self.sim.towers.get(orb.owner_tower_id)
+        if tower is None:
+            return 0.0
+        return self.spec.towers[tower.archetype].snake_tail_length
+
+    def _runtime_spec_for_canvas(self) -> GameSpec:
+        playfield_width = self.canvas.winfo_width()
+        playfield_height = self.canvas.winfo_height()
+        if playfield_width <= 1:
+            playfield_width = self.canvas.winfo_reqwidth()
+        if playfield_height <= 1:
+            playfield_height = self.canvas.winfo_reqheight()
+        return replace(self.spec, playfield_width=playfield_width, playfield_height=playfield_height)

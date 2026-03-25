@@ -1,1 +1,1 @@
-"""Gridline game package."""
+"""Gridline MVP runtime package."""
