@@ -29,11 +29,11 @@ Use this file as the QA-facing working list. Use `agent_log.json` for formal cro
 | OBJ-001 | Launch and smoke-test playable MVP | App boot, run loop, quit, fullscreen, HUD visibility | `todo` | `python main.py` launches, remains stable, supports `Esc` quit and fullscreen toggle, no immediate runtime errors | `main.py`, `gridline/app.py`, `agent_log.json` |
 | OBJ-002 | Validate topology and hardpoint layout | Grid generation, 12-hardpoint perimeter layout, selection readability | `pass` | Exactly 12 hardpoints appear with 3 per side and remain stable through a run | `gridline/topology.py`, `tests/test_simulation.py`, `Game_Design.md` sections `1`, `10` |
 | OBJ-003 | Validate direct hardpoint build flow | Empty-hardpoint build gating, selected-state UI, no activation step | `pass` | Empty hardpoints are directly buildable when affordable, invalid actions are visibly disabled or explained, and no player-facing activation language remains | `gridline/app.py`, `gridline/simulation.py`, `Game_Design.md` sections `2`, `8` |
-| OBJ-004 | Validate base tower behavior and upgrades | `Basic`, `Seed`, `Burst`, upgrade tracks, cooldown/readiness display | `partial` | Towers behave per archetype, all approved upgrade tracks are available, HUD reflects state accurately | `gridline/simulation.py`, `gridline/app.py`, `Game_Design.md` sections `2A`-`2E`, `13`, `14` |
-| OBJ-005 | Validate Seed Tower launch and landing model | Seed targeting, flight time, delayed release, landing behavior | `verify_fix` | Seed launch has real travel phase before orb release; landing obeys target resolution rules | `gridline/simulation.py`, `Game_Design.md` sections `2C`, `3A` |
-| OBJ-006 | Validate power tower funding and override behavior | Funding lockout, active override stats, suspend/restore underlying tower | `verify_fix` | Funding is blocked during active deployment; selected panel reflects active power state; underlying tower restores correctly | `gridline/simulation.py`, `gridline/app.py`, `Game_Design.md` section `7` |
-| OBJ-007 | Validate line-state spread and conflict resolution | Red/green spread timing, intensity, same-step conflict arbitration | `verify_fix` | Same-step red/green conflicts preserve existing color regardless of call order | `gridline/simulation.py`, `Game_Design.md` section `4` |
-| OBJ-008 | Validate Burst/Focus path rules and orb readability | Focus tie-break logic, path-faithful orb trail rendering, combat readability | `verify_fix` | Equal-angle Focus ties randomize correctly and orb trails stay on-grid through turns/intersections while fading from head to oldest tail segment | `gridline/simulation.py`, `gridline/app.py`, `Game_Design.md` sections `2E`, `9` |
+| OBJ-004 | Validate base tower behavior and upgrades | `Basic`, `Seed`, `Burst`, upgrade tracks, cooldown/readiness display | `pass` | Towers behave per archetype, all approved upgrade tracks are available, HUD reflects state accurately | `gridline/simulation.py`, `gridline/app.py`, `Game_Design.md` sections `2A`-`2E`, `13`, `14` |
+| OBJ-005 | Validate Seed Tower launch and landing model | Seed targeting, flight time, delayed release, landing behavior | `pass` | Seed launch has real travel phase before orb release; landing obeys target resolution rules | `gridline/simulation.py`, `Game_Design.md` sections `2C`, `3A` |
+| OBJ-006 | Validate power tower funding and override behavior | Funding lockout, active override stats, suspend/restore underlying tower | `pass` | Funding is blocked during active deployment; selected panel reflects active power state; underlying tower restores correctly | `gridline/simulation.py`, `gridline/app.py`, `Game_Design.md` section `7` |
+| OBJ-007 | Validate line-state spread and conflict resolution | Red/green spread timing, intensity, same-step conflict arbitration | `pass` | Same-step red/green conflicts preserve existing color regardless of call order | `gridline/simulation.py`, `Game_Design.md` section `4` |
+| OBJ-008 | Validate Burst/Focus path rules and orb readability | Focus tie-break logic, path-faithful orb trail rendering, combat readability | `pass` | Equal-angle Focus ties randomize correctly and orb trails stay on-grid through turns/intersections while fading from head to oldest tail segment | `gridline/simulation.py`, `gridline/app.py`, `Game_Design.md` sections `2E`, `9` |
 | OBJ-009 | Validate config-driven runtime values | `game_config.json` mapping into live runtime | `pass` | Visible config changes affect runtime consistently after relaunch | `gridline/spec.py`, `game_config.json`, `game_config_schema.json` |
 | OBJ-010 | Validate regression test coverage for known risk areas | Automated coverage for critical gameplay behaviors | `pass` | Tests cover fixed Seed flight, power funding lockout, spread conflict resolution, Focus tie-breaks, and UI eligibility logic where practical | `tests/test_simulation.py`, `agent_log.json` |
 | OBJ-011 | Validate gameplay readability cues | Enemy seeding telegraph, line-intensity readability, visible orb-impact feedback | `pass` | Corruption seeders darken before release and pulse on seeding, green/red line levels read light-to-dark by intensity, and meaningful orb state changes create an immediately visible line-feedback step | `gridline/simulation.py`, `gridline/app.py`, `Game_Design.md` readability sections |
@@ -42,16 +42,18 @@ Use this file as the QA-facing working list. Use `agent_log.json` for formal cro
 ## Active Bug Queue
 | Bug ID | Priority | Feature | Status | Owner | Summary |
 | --- | --- | --- | --- | --- | --- |
-| BUG-001 | `P0` | Seed Tower launch model | `verify_fix` | Coder | Seed Tower currently skips in-flight seed travel and releases orb immediately at resolved target/start node. |
+| BUG-001 | `P0` | Seed Tower launch model | `pass` | Coder | Seed target resolution now snaps to emit-capable landing nodes so both default Seed and `Recall Mode` release an orb reliably after flight. |
 | BUG-002 | `P0` | Power tower funding rules | `pass` | Coder | Funding can continue while a power tower is already active, violating active-window lockout rules. |
 | BUG-003 | `P1` | Power tower selected-state HUD | `pass` | Coder | Selected panel shows suspended underlying tower instead of active temporary power-state stats during override. |
-| BUG-004 | `P0` | Red/green spread conflict resolution | `verify_fix` | Coder | Spread resolution is order-dependent because red and green mutate state in separate passes instead of a shared arbitration step. |
+| BUG-004 | `P0` | Red/green spread conflict resolution | `pass` | Coder | Same-step red/green spread now preserves the target's existing color and no longer depends on update order. |
 | BUG-005 | `P1` | Sidebar action affordance | `pass` | Coder | Invalid actions remain clickable and fail silently instead of being disabled or explained. |
 | BUG-006 | `P1` | Missing upgrade tracks in UI | `pass` | Coder | Sidebar omits approved upgrade tracks and lacks current-value/next-value preview text. |
-| BUG-007 | `P2` | Orb visual readability | `verify_fix` | Coder | Renderer draws orb heads only; expected trail/glow readability is missing. |
-| BUG-008 | `P1` | Focus mode equal-angle tie behavior | `verify_fix` | Coder | Exact-angle ties collapse to adjacency/order instead of randomized tie-break before forward-bias selection. |
+| BUG-007 | `P2` | Orb visual readability | `pass` | Coder | Renderer now produces path-faithful orb trails that stay on-grid through turns and fade from head to tail. |
+| BUG-008 | `P1` | Focus mode equal-angle tie behavior | `pass` | Coder | Equal-angle Focus candidates now randomize before the forward-bias pick and no longer collapse to a fixed adjacency order. |
 | BUG-009 | `P1` | Automated regression coverage gaps | `pass` | Coder | Current tests do not cover several known high-risk behaviors and can allow regression drift. |
 | BUG-010 | `P1` | Corruption seeder telegraph direction | `pass` | Coder | Corruption seeders currently render darkest when farthest from seeding and become lighter as they approach release, opposite the approved readability rule. |
+| BUG-011 | `P1` | Power tower suspended-state restoration | `pass` | Coder | Suspended towers now freeze their cooldown-backed readiness state during power override so restoration can return the pre-power timings intact. |
+| BUG-012 | `P2` | Secondary mode UI naming | `pass` | Coder | Sidebar mode text and action labels now use explicit fixed mode names instead of generic `secondary` wording. |
 
 ## Bug Details
 
@@ -65,18 +67,19 @@ Use this file as the QA-facing working list. Use `agent_log.json` for formal cro
   - `gridline/simulation.py:405`
   - `gridline/simulation.py:426`
   - `gridline/simulation.py:455`
-- Bug Description: The current implementation resolves the target and spawns the orb as if the seed had already arrived. This removes the documented `launching_seed -> seed_in_flight -> landing_release` sequence and prevents line state from changing meaningfully during flight.
+- Bug Description: The current implementation now includes a real `seed_in_flight` phase, but landing resolution still fails for some validly selected targets because the targeting pool includes intersections that do not have a legal outgoing segment for the tower's current traversal tier on landing.
 - Reproduction Steps:
   1. Launch the game and build a `Seed Tower`.
-  2. Let it acquire a remote target.
-  3. Observe the shot behavior at fire time.
-  4. Compare the observed behavior against the design requirement for a visible or simulated travel phase before orb release.
+  2. Let it acquire and fire at multiple valid in-range targets, or instrument target selection to pick a medium/small intersection that has no legal `large`-tier exit for the current tower access tier.
+  3. Wait for each seed flight to finish.
+  4. Observe whether an orb is released at the landing point.
+  5. Repeat after purchasing and activating `Recall Mode`.
 - Expected vs. Actual Result:
-  - Expected: A seed travels toward the selected target area first, then lands and releases the orb at the landing point after travel time.
-  - Actual: The orb effectively starts at the resolved target/start node immediately, with no meaningful in-flight delay.
+  - Expected: A seed travels toward the selected target area first, then always lands and releases the orb at a valid landing point after travel time.
+  - Actual: Re-test confirmed the fix. `python -m pytest tests/test_simulation.py -q` now passes new regressions that exercise both default Seed mode and `Recall Mode` across repeated launches, and each completed seed flight releases an orb at landing.
 - QA Verification Notes:
-  - Confirm that target line state can change during seed flight and that landing still resolves correctly.
-  - Confirm Recall Mode still follows its local-defense targeting rules after the fix.
+  - The verified implementation resolves landing targets onto emit-capable nodes before launch while preserving the delayed in-flight phase.
+  - This closes both the original default Seed failure and the later `Recall Mode` edge case.
 
 ### BUG-002: Power funding is not locked during active deployment
 - Feature Tested: Power tower funding and active-window restrictions
@@ -124,7 +127,7 @@ Use this file as the QA-facing working list. Use `agent_log.json` for formal cro
 
 ### BUG-004: Red/green spread conflicts are resolved by update order
 - Feature Tested: Shared spread resolution and same-step conflict handling
-- Status: `PARTIAL`
+- Status: `PASS`
 - Source: `designer-20260324-012` in `agent_log.json`
 - Priority: `P0`
 - Coder Target:
@@ -137,10 +140,10 @@ Use this file as the QA-facing working list. Use `agent_log.json` for formal cro
   3. Repeat enough times or under instrumented conditions to check whether result depends on processing order.
 - Expected vs. Actual Result:
   - Expected: If red and green both target the same line in the same step, the target keeps its existing color.
-  - Actual: Result depends on update order/timer alignment.
+  - Actual: Re-test confirmed that same-step conflicts preserve the existing color for blue, red, and green targets, while single-color spread and intensity growth still occur normally.
 - QA Verification Notes:
-  - Verify both visible behavior and automated tests after the fix.
-  - Confirm no regression to single-color spread rates or intensity growth.
+  - Automated coverage in `tests/test_simulation.py` passes.
+  - Targeted retest with forced spread rolls confirmed conflict preservation and continued red-only growth behavior.
 
 ### BUG-005: Sidebar leaves invalid actions clickable
 - Feature Tested: Build/upgrade/purchase affordance and player feedback
@@ -184,7 +187,7 @@ Use this file as the QA-facing working list. Use `agent_log.json` for formal cro
 
 ### BUG-007: Orbs lack trail rendering
 - Feature Tested: Orb readability and rendering fidelity
-- Status: `PARTIAL`
+- Status: `PASS`
 - Source: `designer-20260324-012` in `agent_log.json`
 - Priority: `P2`
 - Coder Target:
@@ -196,13 +199,14 @@ Use this file as the QA-facing working list. Use `agent_log.json` for formal cro
   2. Watch moving orbs against the line network during combat.
 - Expected vs. Actual Result:
   - Expected: Orb heads and trails make travel direction and persistence readable.
-  - Actual: Only orb heads are drawn.
+  - Actual: Re-test confirmed multi-segment trail rendering, on-grid trail continuity through turns/intersections, and head-to-tail fade support in the helper/rendering path.
 - QA Verification Notes:
-  - Re-test readability under dense action, not just isolated shots.
+  - Automated coverage now exercises both multi-segment trail point reconstruction and fade ordering.
+  - Dense live-combat readability still merits future eyeball tuning, but the missing-trail defect itself is resolved for MVP verification scope.
 
 ### BUG-008: Focus Mode tie-breaks are not randomized correctly
 - Feature Tested: `Burst Tower / Focus Mode` path selection
-- Status: `PARTIAL`
+- Status: `PASS`
 - Source: `designer-20260324-012` in `agent_log.json`
 - Priority: `P1`
 - Coder Target:
@@ -215,9 +219,10 @@ Use this file as the QA-facing working list. Use `agent_log.json` for formal cro
   3. Repeat enough times to check whether tie behavior is randomized before weighted forward selection.
 - Expected vs. Actual Result:
   - Expected: Equal-angle ties are randomized first, then the documented forward-bias rule is applied.
-  - Actual: Candidate order is effectively deterministic from sorting/adjacency order.
+  - Actual: Re-test confirmed that equal-angle ties can produce different second-choice branches before the forward-bias selection is applied, matching the approved rule.
 - QA Verification Notes:
-  - This should be verified with automated coverage in addition to manual observation.
+  - Automated coverage in `tests/test_simulation.py` now exercises the equal-angle tie behavior.
+  - Targeted deterministic retests produced both tied side branches under controlled random sequences.
 
 ### BUG-009: Regression coverage is too thin for current risk areas
 - Feature Tested: Automated test coverage for high-risk behavior
@@ -258,6 +263,48 @@ Use this file as the QA-facing working list. Use `agent_log.json` for formal cro
   - Actual: The enemy starts darker and becomes lighter as the seeding moment approaches.
 - QA Verification Notes:
   - The pulse-on-seed effect appears present; the issue is the countdown telegraph direction before release.
+
+### BUG-011: Suspended tower cooldown does not restore intact after power override
+- Feature Tested: `Power Tower` override restoration behavior
+- Status: `PASS`
+- Source: tester verification against `Game_Design.md` section `7`
+- Priority: `P1`
+- Coder Target:
+  - `gridline/simulation.py`
+- Bug Description: A permanent tower suspended under power override continued advancing its cooldown timers while the power tower was active, so the restored tower did not return in its full pre-power readiness state.
+- Reproduction Steps:
+  1. Build a tower on a hardpoint.
+  2. Put that tower on a non-zero fire cooldown, and optionally a non-zero swap cooldown.
+  3. Fully charge and deploy the power tower onto that occupied hardpoint.
+  4. Wait for the power window to expire.
+  5. Compare the restored tower's cooldown/readiness state with the values it had at the moment of deployment.
+- Expected vs. Actual Result:
+  - Expected: The underlying tower returns with its pre-power state intact, including readiness and cooldown state.
+  - Actual: Re-test confirmed the fix. The suspended tower's fire and swap cooldown values remain unchanged across a full power-override window and restore intact when the power state ends.
+- QA Verification Notes:
+  - Funding lockout and active selected-object reporting remain correct.
+  - The regression suite now covers the restored cooldown values directly.
+
+### BUG-012: Sidebar uses generic secondary-mode naming
+- Feature Tested: Secondary-mode HUD and action labeling
+- Status: `PASS`
+- Source: tester verification against `Game_Design.md` sections `2D` and `2E`
+- Priority: `P2`
+- Coder Target:
+  - `gridline/app.py`
+  - `gridline/simulation.py`
+- Bug Description: The sidebar reported generic secondary-mode wording such as `Mode: secondary`, `Buy Secondary`, and `Swap Mode` instead of the explicit approved mode names `Guard Mode`, `Recall Mode`, and `Focus Mode`.
+- Reproduction Steps:
+  1. Build any tower with a fixed secondary behavior.
+  2. Purchase its secondary mode.
+  3. Toggle into that mode.
+  4. Inspect the selected-object text and related action labels in the sidebar.
+- Expected vs. Actual Result:
+  - Expected: The selected panel and actions use explicit named mode labels for the active archetype.
+  - Actual: Re-test confirmed the fix. The selected-object panel now shows explicit mode names such as `Recall Mode`, and the contextual action labels use named wording such as `Buy Recall Mode` and `Switch to Default Mode`.
+- QA Verification Notes:
+  - Automated regression now checks `Recall Mode` naming in both the selected-object text and the sidebar action labels.
+  - This closes the remaining HUD signoff blocker for `OBJ-004`.
 
 ## Next QA Sequence
 1. Re-run smoke and interaction testing after the next coder pass.

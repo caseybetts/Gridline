@@ -71,6 +71,56 @@ def test_seed_tower_uses_delayed_flight_before_orb_release():
     assert len(sim.orbs) >= 1
 
 
+def test_seed_tower_landing_always_resolves_to_emit_capable_node():
+    sim = GameSimulation(default_spec())
+    first = next(iter(sim.hardpoints.values()))
+    sim.selected_hardpoint_id = first.hardpoint.key
+    sim.build_tower("seed_tower")
+    tower = first.tower
+    assert tower is not None
+    sim.coins = 999
+
+    for _ in range(20):
+        tower.fire_cooldown = 0.0
+        sim.orbs.clear()
+        sim.seed_flights.clear()
+        sim._attempt_fire_tower(tower)
+        assert len(sim.seed_flights) == 1
+        flight = next(iter(sim.seed_flights.values()))
+        assert sim._legal_segments_from_node(flight.target_node_id, None, flight.current_tier)
+        for _ in range(200):
+            sim._update_seed_flights(1.0 / sim.spec.simulation_tick_rate)
+            if sim.orbs:
+                break
+        assert len(sim.orbs) == 1
+
+
+def test_recall_mode_seed_landing_always_releases_an_orb():
+    sim = GameSimulation(default_spec())
+    first = next(iter(sim.hardpoints.values()))
+    sim.selected_hardpoint_id = first.hardpoint.key
+    sim.build_tower("seed_tower")
+    tower = first.tower
+    assert tower is not None
+    sim.coins = 999
+    assert sim.purchase_secondary_mode()
+    assert sim.toggle_selected_mode()
+
+    for _ in range(20):
+        tower.fire_cooldown = 0.0
+        sim.orbs.clear()
+        sim.seed_flights.clear()
+        sim._attempt_fire_tower(tower)
+        assert len(sim.seed_flights) == 1
+        flight = next(iter(sim.seed_flights.values()))
+        assert sim._legal_segments_from_node(flight.target_node_id, None, flight.current_tier)
+        for _ in range(200):
+            sim._update_seed_flights(1.0 / sim.spec.simulation_tick_rate)
+            if sim.orbs:
+                break
+        assert len(sim.orbs) == 1
+
+
 def test_power_funding_is_locked_while_active():
     sim = GameSimulation(default_spec())
     first = next(iter(sim.hardpoints.values()))
@@ -123,6 +173,27 @@ def test_power_override_selected_snapshot_reports_power_state():
     availability = sim.action_availability()
     assert availability["buy_secondary"][0] is False
     assert availability["upgrade_fire_rate"][0] is False
+
+
+def test_power_override_restores_suspended_tower_cooldowns_intact():
+    sim = GameSimulation(default_spec())
+    first = next(iter(sim.hardpoints.values()))
+    sim.selected_hardpoint_id = first.hardpoint.key
+    sim.build_tower("basic_tower")
+    tower = first.tower
+    assert tower is not None
+    tower.fire_cooldown = 0.8
+    tower.swap_cooldown = 1.7
+    sim.power.charged = True
+    assert sim.deploy_power_to_selected()
+
+    for _ in range(int(sim.spec.power_duration * sim.spec.simulation_tick_rate)):
+        sim.update(1.0 / sim.spec.simulation_tick_rate)
+
+    restored = first.tower
+    assert restored is tower
+    assert restored.fire_cooldown == 0.8
+    assert restored.swap_cooldown == 1.7
 
 
 def test_action_availability_and_upgrade_preview_cover_batch_2_ui_logic():
@@ -331,6 +402,33 @@ def test_sidebar_uses_contextual_action_groups():
     app.root.update_idletasks()
     assert app.action_groups["tower"].winfo_manager() == "pack"
     assert app.action_groups["seed"].winfo_manager() == "pack"
+
+    app.root.destroy()
+
+
+def test_sidebar_uses_explicit_secondary_mode_names_in_details_and_actions():
+    app = GridlineApp(default_spec())
+    app.root.update()
+    first = next(iter(app.sim.hardpoints.values()))
+    app.sim.selected_hardpoint_id = first.hardpoint.key
+    app.sim.build_tower("seed_tower")
+    tower = first.tower
+    assert tower is not None
+    app.sim.coins = 999
+    app._refresh_sidebar()
+    app.root.update_idletasks()
+
+    assert app.action_buttons["buy_secondary"].cget("text") == "Buy Recall Mode"
+    assert "Mode: Default" in app.detail_text.get()
+
+    assert app.sim.purchase_secondary_mode()
+    assert app.sim.toggle_selected_mode()
+    app._refresh_sidebar()
+    app.root.update_idletasks()
+
+    assert "Mode: Recall Mode" in app.detail_text.get()
+    assert "Recall Mode unlocked: Yes" in app.detail_text.get()
+    assert app.action_buttons["swap_mode"].cget("text") == "Switch to Default Mode"
 
     app.root.destroy()
 

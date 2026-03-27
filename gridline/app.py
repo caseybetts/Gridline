@@ -248,7 +248,7 @@ class GridlineApp:
             "Tower Controls",
             [
                 ("buy_secondary", "Buy Secondary", lambda: self.sim.purchase_secondary_mode()),
-                ("swap_mode", "Swap Mode", lambda: self.sim.toggle_selected_mode()),
+                ("swap_mode", "Switch Mode", lambda: self.sim.toggle_selected_mode()),
                 ("upgrade_fire_rate", "Upgrade Fire Rate", lambda: self.sim.upgrade_selected_tower_type("fire_rate")),
                 ("upgrade_hp", "Upgrade HP", lambda: self.sim.upgrade_selected_tower_type("hp")),
                 ("upgrade_snake_speed", "Upgrade Snake Speed", lambda: self.sim.upgrade_selected_tower_type("snake_speed")),
@@ -411,9 +411,9 @@ class GridlineApp:
                 [
                     f"Tower: {selected['name']}",
                     f"HP: {selected['hp']:.0f}/{selected['max_hp']:.0f}",
-                    f"Mode: {selected['mode']}",
+                    f"Mode: {selected['mode_name']}",
                     f"Fire: {fire_text}",
-                    f"Secondary unlocked: {selected['secondary_unlocked']}",
+                    f"{selected['secondary_mode_name']} unlocked: {'Yes' if selected['secondary_unlocked'] else 'No'}",
                     f"Swap cooldown: {selected['swap_cooldown']:.1f}s",
                 ]
             )
@@ -440,6 +440,7 @@ class GridlineApp:
             visible_groups = ["tower", "seed", "power"]
         elif context == "power":
             visible_groups = ["power"]
+        self._update_context_action_labels(selected)
 
         for group_key, group_frame in self.action_groups.items():
             if group_key == "seed":
@@ -458,6 +459,20 @@ class GridlineApp:
             button.configure(state=tk.NORMAL if enabled else tk.DISABLED)
         for button in self.utility_buttons.values():
             button.configure(state=tk.NORMAL)
+
+    def _update_context_action_labels(self, selected: dict[str, object]) -> None:
+        buy_label = "Buy Secondary"
+        swap_label = "Switch Mode"
+        if selected.get("kind") == "tower":
+            secondary_mode_name = selected.get("secondary_mode_name")
+            if secondary_mode_name:
+                buy_label = f"Buy {secondary_mode_name}"
+                if selected.get("mode") == "secondary":
+                    swap_label = "Switch to Default Mode"
+                else:
+                    swap_label = f"Switch to {secondary_mode_name}"
+        self.action_buttons["buy_secondary"].configure(text=buy_label)
+        self.action_buttons["swap_mode"].configure(text=swap_label)
 
     def _render(self) -> None:
         self.canvas.delete("all")

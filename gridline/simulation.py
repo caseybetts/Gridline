@@ -368,6 +368,8 @@ class GameSimulation:
             "hp": tower.hp,
             "max_hp": tower.max_hp,
             "mode": tower.active_mode,
+            "mode_name": self.mode_name_for_tower(tower),
+            "secondary_mode_name": self.secondary_mode_name_for_tower(tower),
             "fire_ready": tower.fire_cooldown <= 0,
             "fire_cooldown": tower.fire_cooldown,
             "swap_cooldown": tower.swap_cooldown,
@@ -407,10 +409,10 @@ class GameSimulation:
             if tower.hp <= 0:
                 self._destroy_tower(tower)
                 continue
-            tower.fire_cooldown = max(0.0, tower.fire_cooldown - dt)
-            tower.swap_cooldown = max(0.0, tower.swap_cooldown - dt)
             if self.power.active_hardpoint_id == tower.hardpoint_id:
                 continue
+            tower.fire_cooldown = max(0.0, tower.fire_cooldown - dt)
+            tower.swap_cooldown = max(0.0, tower.swap_cooldown - dt)
             if tower.fire_cooldown <= 0:
                 self._attempt_fire_tower(tower)
         if self.power.active_hardpoint_id is not None and self.power.time_remaining > 0:
@@ -465,13 +467,19 @@ class GameSimulation:
                 target_node_id = self._select_seed_target(tower, launch_node.key, self.shot_range_value(tower))
                 if target_node_id is None:
                     continue
-                self._launch_seed_flight(tower, launch_node.key, target_node_id)
+                landing_node_id = self._resolve_seed_landing_node(target_node_id, self.tower_grid_access_tier(tower))
+                if landing_node_id is None:
+                    continue
+                self._launch_seed_flight(tower, launch_node.key, landing_node_id)
                 continue
             elif tower.archetype == "seed_tower" and mode_spec and mode_spec.launch_range_override:
                 local_target = self._select_local_node(launch_node.key, self.shot_range_value(tower, mode_spec.launch_range_override))
                 if local_target is None:
                     continue
-                self._launch_seed_flight(tower, launch_node.key, local_target)
+                landing_node_id = self._resolve_seed_landing_node(local_target, self.tower_grid_access_tier(tower))
+                if landing_node_id is None:
+                    continue
+                self._launch_seed_flight(tower, launch_node.key, landing_node_id)
                 continue
             self._spawn_orb_from_node(tower, launch_node.key, launch_node.key)
         self.shots_fired_times.append(self.run_time)
@@ -559,11 +567,13 @@ class GameSimulation:
 
     def _select_seed_target(self, tower: TowerInstance, home_node_id: str, shot_range: float) -> str | None:
         home = self.topology.nodes[home_node_id]
+        max_tier = self.tower_grid_access_tier(tower)
         candidates = [
             node
             for node in self.topology.nodes.values()
             if {"large", "medium"} & node.tiers
             and math.dist((home.x, home.y), (node.x, node.y)) <= shot_range
+            and self._node_can_emit(node.key, max_tier)
         ]
         if not candidates:
             return None
@@ -587,6 +597,28 @@ class GameSimulation:
             highest = max(self._node_intensity(node.key) for node in bucket)
             bucket = [node for node in bucket if self._node_intensity(node.key) == highest] or bucket
         return self.random.choice(bucket).key if bucket else None
+
+    def _resolve_seed_landing_node(self, preferred_node_id: str, max_tier: str) -> str | None:
+        if self._node_can_emit(preferred_node_id, max_tier):
+            return preferred_node_id
+        target = self.topology.nodes[preferred_node_id]
+        candidates = [
+            node
+            for node in self.topology.nodes.values()
+            if self._node_can_emit(node.key, max_tier)
+        ]
+        if not candidates:
+            return None
+        return min(
+            candidates,
+            key=lambda node: (
+                math.dist((target.x, target.y), (node.x, node.y)),
+                node.key,
+            ),
+        ).key
+
+    def _node_can_emit(self, node_id: str, max_tier: str) -> bool:
+        return bool(self._legal_segments_from_node(node_id, None, max_tier))
 
     def _node_color_bucket(self, node_id: str) -> str:
         color = "blue"
@@ -1140,6 +1172,15 @@ class GameSimulation:
         if tower.active_mode == "secondary" and mode_spec is not None:
             return mode_spec.snake_speed_multiplier
         return 1.0
+
+    def secondary_mode_name_for_tower(self, tower: TowerInstance) -> str:
+        mode_spec = self.spec.towers[tower.archetype].secondary_mode
+        return mode_spec.name if mode_spec is not None else "Secondary"
+
+    def mode_name_for_tower(self, tower: TowerInstance) -> str:
+        if tower.active_mode == "secondary":
+            return self.secondary_mode_name_for_tower(tower)
+        return "Default"
 
     def damage_multiplier(self, tower: TowerInstance) -> float:
         mode_spec = self.spec.towers[tower.archetype].secondary_mode
