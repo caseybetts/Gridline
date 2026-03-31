@@ -1,0 +1,7 @@
+Entry format:
+- use one plain-text line per entry in this exact order:
+  `[Timestamp][Sending Agent][Receiving Agent][Handoff Text]`
+- Handoff Text should be exactly what was added to the Current Inbox or Deffered field
+- If multiple handoffs were made, add each one as a separate line
+
+Entries:

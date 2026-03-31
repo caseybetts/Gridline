@@ -12,6 +12,45 @@
 - Core fantasy: cleaning and containment under pressure.
 - Primary protection target is overall grid integrity; towers are a secondary protection concern.
 
+## Current Milestone
+- Current project phase: post-MVP tuning pass for the first stable playable build.
+- Immediate milestone goal: convert the now-verified MVP into a playtest-ready build with clearer pacing, balance priorities, and polish targets.
+- Scope rule for this phase: prioritize tuning, readability, and feel over adding new mechanics or expanding feature count.
+- Current batch after the first verified readability/usability pass: emergency opener-stabilization tuning based on the first Section 20 live-play evidence.
+- Immediate batch goal: eliminate catastrophic sub-minute opener collapse so the project can return to meaningful evaluation of the full 10 to 15 minute target band.
+- Current batch after the verified power-reachability pass: extend competent runs into longer sessions so role separation, late-use systems, and overall pacing can be judged; keep the power tower as an emergency stabilizer rather than a dominant rush.
+- Current batch after the verified config-agnostic HUD/sidebar pass: resume broader Section 20 validation with pacing as the first gate and role separation / late-use judgment as the second gate, using the now-stable UI as the baseline presentation layer.
+- Current batch after the latest `Play_Tester_Notes.md` intake: shift immediate priority from exact survival-time chasing to clarity and readability fixes that make live play easier to judge; final runtime tuning can remain a later config pass unless runs collapse so early that feature evaluation becomes impossible again.
+- Current batch after verified grouped-control stability and directional orb-impact cues: treat the readability/control-panel follow-up as cleared for this phase and move the active focus to qualitative role separation, secondary-mode value, power-tower judgment, and remaining high-signal polish observations rather than exact runtime convergence.
+- Playtest-intake triage priorities after the first raw `Play_Tester_Notes.md` pass:
+  - treat unreachable build controls or off-screen contextual actions as a real usability regression, not optional polish
+  - strengthen player-visible feedback for orb-driven corruption reduction and green-line harvest results if current line-state stepping is not reading clearly enough in live play
+  - improve test-facing economy clarity so playtesters can tell what harvest income is being earned and which tower behaviors are producing it
+  - treat persistent edge-hugging or one-direction default firing from `Basic Tower` and `Seed Tower` as a core-fantasy problem, because those towers are supposed to create meaningful interior-grid influence from edge hardpoints
+  - defer hardpoint-count expansion until after tower emission/pathing behavior is corrected enough to judge whether topology is actually the problem
+  - keep sleek/futuristic orb-trail finish as a required end-state, but prioritize gameplay readability and strategic legibility ahead of pure visual-polish upgrades
+- Current planner priorities:
+  - keep enough survivability that informed play reaches a real decision window instead of failing in seconds
+  - avoid blocking the current iteration on exact survival-time tuning now that the major readability and usability notes have landed
+  - leave final runtime/balance precision as a later config-oriented pass unless pacing becomes a clear blocker again
+  - preserve distinct tower-role identities and meaningful secondary-mode tradeoffs
+  - keep the power tower as an emergency stabilizer, not a dominant default strategy, while making it practically reachable in reasonable runs
+  - use the stabilized UI/readability baseline to collect better evidence about role feel, late-use value, and remaining polish gaps
+  - address only polish or behavior issues that materially improve readability, usability, or run quality
+- Evidence rule for this batch: use the latest power-reachability evidence and the verified `OBJ-016` UI/readability baseline as the starting point for new Section 20 judgments.
+- Batch scope rule: keep the now-verified control-panel stability, grouped presentation, and directional orb-impact readability as the baseline, and spend the next evaluation pass judging role clarity, secondary-mode usefulness, power timing, and remaining high-value polish without adding mechanics.
+- Follow-up scope rule after the UI/readability gate: broader Section 20 role-separation and late-use evaluation is now the active lane, while exact convergence on the 10 to 15 minute target band remains deferred unless pacing visibly undermines that evaluation again.
+- Explicit non-goal for this phase: no new enemy classes, bosses, tower archetypes, or meta-progression systems until the current core loop proves consistently fun in playtesting
+- Explicit defer from the latest raw playtest intake:
+  - do not add a new green-seeding ally or anti-enemy during this tuning phase
+  - do not change the approved grid-access progression by making default seed behavior automatically use medium-grid travel without a broader planner decision
+  - treat any seed-launch-path presentation concerns as a later readability/design question unless they become a clear active blocker
+- New playtest-intake priorities from the latest notes:
+  - keep sidebar buttons and status text visually stationary as context changes, rather than allowing the panel to visibly reflow around longer labels or changing detail blocks
+  - prefer grouped, shorter action labels and denser action presentation over long repeated button phrasing; symbolic tower buttons are acceptable if the designer can keep them readable
+  - if the current single-column action region cannot stay stable and fully reachable, a multi-column action treatment is an approved direction to explore
+  - make orb-driven corruption reduction read as a more predictable player-facing cause-and-effect chain, even when the underlying path walk remains intentionally stochastic
+
 ## Core Gameplay Loop
 1. Initialize windowed display (with fullscreen toggle), grid, sidebar UI, glow surface.
 2. Spawn enemies continuously with randomized timing.
@@ -34,6 +73,8 @@
 - Visual style target remains the provided `Style Example.jpg`: dark technical look, subtle glow, meaningful transparency, and shadowing.
 - Grid density/scale is configurable; current direction is to run at half the prior effective grid scale for denser line detail.
 - Grid layer widths and brightness should remain clearly differentiated after scaling (large > medium > small).
+- The current orb/trail look may remain temporary during tuning, but the final shipped direction must still achieve a sleek, futuristic, technically polished read rather than a visibly granular placeholder style.
+- Visual polish is still an open pipeline item. Current readability-focused visuals are acceptable as temporary tuning-state presentation, but final sign-off still requires a stronger polished pass against `Style Example.jpg`.
 - See "Style Example.jpg".
 
 ## Towers
@@ -64,6 +105,8 @@
   - Seed Tower -> `Recall Mode`: replaces deep launch behavior with shorter-range defensive seeding around the hosting hardpoint, creating a local containment posture instead of remote map reach.
   - Burst Tower -> `Focus Mode`: compresses the burst into fewer, more directed shots with better forward reach and cleaner lane pressure, trading away some of the default chaos and close-defense saturation.
 - Archetype details are expected to be tuned through playtesting.
+- `Basic Tower` and `Seed Tower` default output should create meaningful pressure and coverage into the interior network from their edge hardpoints; persistent edge-skimming behavior or effectively one-direction default firing is not acceptable as the settled play pattern.
+- If tower output is staying too close to the perimeter, first adjust existing emission/pathing/targeting behavior before changing hardpoint count or introducing new placement systems.
 - Seed Tower target-selection behavior is auto-targeted but probabilistic and player-adjustable via three levers:
   - `closest_vs_random`: chance to prefer closest valid target vs random target.
   - `red_vs_green`: chance to prioritize red lines vs green lines.
@@ -83,6 +126,7 @@
 - Early-game tuning target is forgiving to support experimentation and build exploration.
 - Enemy kills do not provide income.
 - Income comes from harvesting green gridlines; greener lines are worth more.
+- During active tuning, temporary HUD or telemetry support is allowed if needed to make harvest income, harvest source, and comparative tower economic contribution easier for testers to understand.
 
 ## Upgrades
 - Sidebar buttons for:
@@ -124,6 +168,8 @@
 - If green and red compete for the same line at the same time, they cancel out and the line remains its current color state.
 - Red/green spread should execute across all grid tiers (`large`, `medium`, `small`) with explicit tier-aware spread passes (configurable profile/weights).
 - Orb interaction must cause a noticeable visual step on affected lines so the player can immediately see what the orb accomplished. For MVP clarity, an orb pass should visibly knock a corrupted or green line down by one visible color/intensity level whenever progress is meaningfully applied.
+- The player-facing read should make it easier to tell that orb activity is reducing corruption in a legible, semi-predictable way even when the exact orb path remains uncontrollable.
+- If line-intensity stepping alone does not make cleaning and harvesting legible enough during playtests, additional lightweight feedback cues are in scope as long as they reinforce rather than replace the line-state model.
 
 ## Enemy Pressure Model
 - Enemies apply mixed pressure:
@@ -170,15 +216,19 @@
 - The right-side UI should behave like a structured control panel, not a single long stack of buttons and text.
 - Core run status and selected-object details should remain visible without pushing important actions off-screen.
 - The sidebar should support sectioning and overflow management so selecting a tower or hardpoint never makes controls unreachable.
+- Action rows and status blocks should stay visually stable as selection context changes; avoid noticeable control jumping caused by long labels, changing helper text, or inconsistent button sizing.
 - Preferred layout direction:
   - Persistent top status area for run-critical information.
   - Selected-object details in a dedicated panel beneath status.
   - Context-sensitive action area beneath details for build, upgrade, mode, and seed-targeting controls.
   - Separate utility/menu area for low-frequency actions such as `New Game`, rather than mixing them into the main tower-control stack.
 - The main action area should be scrollable or paged if needed, but the design should avoid forcing the player to hunt through an unstructured button column.
+- Group related controls under concise section labels and shorten repeated button text where possible; compact icon or symbol support for tower-choice buttons is allowed if readability stays strong.
+- If a stable one-column layout cannot hold the required controls without jumpiness or clipping, a deliberate multi-column action layout is an approved option.
 - Build controls should appear when an empty hardpoint is selected.
 - Tower management controls should appear when a tower is selected.
 - Power-tower and utility controls should be visually separated from tower-specific controls.
+- Selecting an empty hardpoint must never push the build controls off-screen or make the available tower choices unreachable.
 - The UI should feel sleek and technical: compact, readable, and deliberate, with clear grouping and hierarchy rather than raw button accumulation.
 - High-frequency gameplay controls should be prioritized for immediate visibility; low-frequency controls should be moved to a quieter menu/utility region.
 

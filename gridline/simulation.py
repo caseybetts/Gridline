@@ -61,6 +61,8 @@ class Orb:
     trail_nodes: list[str] = field(default_factory=list)
     forced_uturn_used: bool = False
     burst_bias_forward: float | None = None
+    interior_bias_edge: str | None = None
+    interior_bias_remaining: float = 0.0
 
 
 @dataclass
@@ -112,6 +114,7 @@ class PowerState:
 class SegmentImpact:
     color: str
     intensity: int
+    effect: str
     time_remaining: float
     duration: float
 
@@ -121,6 +124,26 @@ class SeedPulse:
     node_id: str
     time_remaining: float
     duration: float
+
+
+@dataclass
+class HarvestPopup:
+    segment_id: str
+    amount: int
+    label: str
+    time_remaining: float
+    duration: float
+
+
+@dataclass
+class HarvestRecord:
+    timestamp: float
+    segment_id: str
+    amount: int
+    owner_tower_id: str | None
+    owner_hardpoint_id: str | None
+    tower_name: str
+    mode_name: str
 
 
 UPGRADE_DISPLAY = {
@@ -153,6 +176,8 @@ class GameSimulation:
         self.power = PowerState()
         self.segment_impacts: dict[str, SegmentImpact] = {}
         self.seed_pulses: list[SeedPulse] = []
+        self.harvest_popups: list[HarvestPopup] = []
+        self.harvest_history: deque[HarvestRecord] = deque()
         self.global_upgrade_levels = {
             tower_key: {name: 0 for name in self.spec.upgrade_costs}
             for tower_key in self.spec.towers
@@ -401,6 +426,7 @@ class GameSimulation:
         self._update_feedback_effects(dt)
         self._spawn_enemies(dt)
         self._trim_shot_history()
+        self._trim_harvest_history()
         if self.corruption_percent() >= self.spec.corruption_failure_threshold:
             self.game_over = True
 
@@ -510,9 +536,15 @@ class GameSimulation:
     def _spawn_orb_from_node(self, tower: TowerInstance, start_node_id: str, home_node_id: str) -> bool:
         tower_spec = self.spec.towers[tower.archetype]
         mode_spec = tower_spec.secondary_mode if tower.active_mode == "secondary" else None
-        segment_id, to_node = self._pick_initial_segment(start_node_id, self.tower_grid_access_tier(tower))
+        segment_id, to_node = self._pick_initial_segment_for_tower(
+            tower,
+            start_node_id,
+            home_node_id,
+            self.tower_grid_access_tier(tower),
+        )
         if segment_id is None:
             return False
+        interior_bias_edge = self._interior_bias_edge_for_tower(tower, home_node_id)
         orb = Orb(
             key=self.next_id("orb"),
             owner_tower_id=tower.key,
@@ -531,6 +563,8 @@ class GameSimulation:
             mode=tower.active_mode,
             home_node_id=home_node_id,
             burst_bias_forward=tower_spec.secondary_mode.forward_bias if (mode_spec and tower.active_mode == "secondary") else None,
+            interior_bias_edge=interior_bias_edge,
+            interior_bias_remaining=float(self.spec.large_spacing) if interior_bias_edge is not None else 0.0,
         )
         self.orbs[orb.key] = orb
         return True
@@ -555,6 +589,26 @@ class GameSimulation:
         next_node = segment.b if segment.a == node_id else segment.a
         return segment_id, next_node
 
+    def _pick_initial_segment_for_tower(
+        self,
+        tower: TowerInstance,
+        start_node_id: str,
+        home_node_id: str,
+        max_tier: str,
+    ) -> tuple[str | None, str | None]:
+        candidates = self._legal_segments_from_node(start_node_id, None, max_tier)
+        if not candidates:
+            return None, None
+        origin_edge = self._interior_bias_edge_for_tower(tower, home_node_id)
+        if origin_edge is not None and tower.archetype == "seed_tower":
+            interior = self._segments_increasing_edge_distance(start_node_id, candidates, origin_edge)
+            if interior:
+                candidates = interior
+        segment_id = self.random.choice(candidates)
+        segment = self.topology.segments[segment_id]
+        next_node = segment.b if segment.a == start_node_id else segment.a
+        return segment_id, next_node
+
     def _select_local_node(self, home_node_id: str, radius: float) -> str | None:
         home = self.topology.nodes[home_node_id]
         candidates = [
@@ -577,6 +631,10 @@ class GameSimulation:
         ]
         if not candidates:
             return None
+        origin_edge = self._origin_edge_for_node(home_node_id)
+        interior_candidates = [node for node in candidates if self._is_node_interior_preferred(node.key, origin_edge)]
+        if interior_candidates:
+            candidates = interior_candidates
         bucket = candidates
         wants_red = self.random.random() < (tower.seed_red_vs_green / 100.0)
         preferred_color = "red" if wants_red else "green"
@@ -660,6 +718,8 @@ class GameSimulation:
                 orb.distance_on_segment = overflow
                 segment = self.topology.segments[orb.segment_id]
             if orb.key in self.orbs:
+                if orb.interior_bias_remaining > 0:
+                    orb.interior_bias_remaining = max(0.0, orb.interior_bias_remaining - travel)
                 self._damage_enemies_on_segment(orb)
 
     def _apply_orb_to_segment(self, segment_id: str, distance: float, orb: Orb) -> None:
@@ -670,7 +730,12 @@ class GameSimulation:
             while state.intensity > 0 and state.clean_progress >= threshold:
                 state.clean_progress -= threshold
                 state.intensity -= 1
-                self._trigger_segment_impact(segment_id, state.color if state.intensity > 0 else "blue", state.intensity)
+                self._trigger_segment_impact(
+                    segment_id,
+                    state.color if state.intensity > 0 else "blue",
+                    state.intensity,
+                    effect="clean",
+                )
                 if state.intensity == 0:
                     state.color = "blue"
                     state.clean_progress = 0.0
@@ -682,9 +747,16 @@ class GameSimulation:
             threshold = self.spec.green_harvest_thresholds[state.intensity - 1]
             while state.intensity > 0 and state.harvest_progress >= threshold:
                 state.harvest_progress -= threshold
-                self.coins += self.spec.harvest_income_green[state.intensity - 1]
+                income = self.spec.harvest_income_green[state.intensity - 1]
+                self.coins += income
+                self._record_harvest_event(segment_id, income, orb)
                 state.intensity -= 1
-                self._trigger_segment_impact(segment_id, state.color if state.intensity > 0 else "blue", state.intensity)
+                self._trigger_segment_impact(
+                    segment_id,
+                    state.color if state.intensity > 0 else "blue",
+                    state.intensity,
+                    effect="harvest",
+                )
                 if state.intensity == 0:
                     state.color = "blue"
                     state.clean_progress = 0.0
@@ -719,6 +791,12 @@ class GameSimulation:
         return segment_id, next_node
 
     def _select_segment_for_tower(self, tower: TowerInstance, orb: Orb, node_id: str, candidates: list[str]) -> str:
+        interior_bias_remaining = getattr(orb, "interior_bias_remaining", 0.0)
+        interior_bias_edge = getattr(orb, "interior_bias_edge", None)
+        if interior_bias_remaining > 0 and interior_bias_edge is not None:
+            interior_candidates = self._segments_increasing_edge_distance(node_id, candidates, interior_bias_edge)
+            if interior_candidates:
+                candidates = interior_candidates
         current_heading = self._heading(orb.from_node, node_id)
         if tower.archetype == "basic_tower" and orb.mode == "default":
             straightest = self._smallest_angle_segment(node_id, current_heading, candidates)
@@ -958,7 +1036,7 @@ class GameSimulation:
             state.intensity = max(state.intensity, intensity)
             state.clean_progress = 0.0
             state.harvest_progress = 0.0
-            self._trigger_segment_impact(segment_id, state.color, state.intensity)
+            self._trigger_segment_impact(segment_id, state.color, state.intensity, effect="corruption")
             return
 
     def _update_power(self, dt: float) -> None:
@@ -1016,13 +1094,18 @@ class GameSimulation:
             pulse.time_remaining = max(0.0, pulse.time_remaining - dt)
             if pulse.time_remaining <= 0:
                 self.seed_pulses.remove(pulse)
+        for popup in list(self.harvest_popups):
+            popup.time_remaining = max(0.0, popup.time_remaining - dt)
+            if popup.time_remaining <= 0:
+                self.harvest_popups.remove(popup)
 
-    def _trigger_segment_impact(self, segment_id: str, color: str, intensity: int) -> None:
+    def _trigger_segment_impact(self, segment_id: str, color: str, intensity: int, effect: str = "generic") -> None:
         self.segment_impacts[segment_id] = SegmentImpact(
             color=color,
             intensity=intensity,
-            time_remaining=0.22,
-            duration=0.22,
+            effect=effect,
+            time_remaining=0.30,
+            duration=0.30,
         )
 
     def _collect_spread_proposals(self, color: str, tier: str, proposals: dict[str, set[str]]) -> None:
@@ -1157,6 +1240,11 @@ class GameSimulation:
         while self.shots_fired_times and self.shots_fired_times[0] < cutoff:
             self.shots_fired_times.popleft()
 
+    def _trim_harvest_history(self, window: float = 8.0) -> None:
+        cutoff = self.run_time - window
+        while self.harvest_history and self.harvest_history[0].timestamp < cutoff:
+            self.harvest_history.popleft()
+
     def _destroy_tower(self, tower: TowerInstance) -> None:
         hardpoint_state = self.hardpoints[tower.hardpoint_id]
         hardpoint_state.tower = None
@@ -1228,11 +1316,136 @@ class GameSimulation:
             return mode_spec.turn_chance_override
         return base
 
+    def shot_cost_value(self, tower: TowerInstance) -> float:
+        tower_spec = self.spec.towers[tower.archetype]
+        mode_spec = tower_spec.secondary_mode if tower.active_mode == "secondary" else None
+        return tower_spec.shot_cost * (mode_spec.shot_cost_multiplier if mode_spec is not None else 1.0)
+
     def tower_grid_access_tier(self, tower: TowerInstance) -> str:
         start = self.spec.towers[tower.archetype].grid_access_tier_start
         level = self.global_upgrade_levels[tower.archetype]["grid_access_tier"]
         index = min(TIER_INDEX[start] + level, TIER_INDEX["small"])
         return {index: tier for tier, index in TIER_INDEX.items()}[index]
+
+    def _origin_edge_for_node(self, node_id: str) -> str:
+        node = self.topology.nodes[node_id]
+        left, top, right, bottom = self.topology.playfield_rect
+        return min(
+            (
+                ("left", abs(node.x - left)),
+                ("right", abs(right - node.x)),
+                ("top", abs(node.y - top)),
+                ("bottom", abs(bottom - node.y)),
+            ),
+            key=lambda item: item[1],
+        )[0]
+
+    def _distance_from_edge_for_node(self, node_id: str, edge: str) -> float:
+        node = self.topology.nodes[node_id]
+        left, top, right, bottom = self.topology.playfield_rect
+        distances = {
+            "left": node.x - left,
+            "right": right - node.x,
+            "top": node.y - top,
+            "bottom": bottom - node.y,
+        }
+        return float(distances[edge])
+
+    def _is_node_interior_preferred(self, node_id: str, origin_edge: str) -> bool:
+        return self._distance_from_edge_for_node(node_id, origin_edge) > float(self.spec.large_spacing)
+
+    def _segments_increasing_edge_distance(self, node_id: str, candidates: list[str], origin_edge: str) -> list[str]:
+        current_distance = self._distance_from_edge_for_node(node_id, origin_edge)
+        return [
+            segment_id
+            for segment_id in candidates
+            if self._distance_from_edge_for_node(self._far_endpoint(node_id, segment_id), origin_edge) > current_distance
+        ]
+
+    def _interior_bias_edge_for_tower(self, tower: TowerInstance, home_node_id: str) -> str | None:
+        if tower.active_mode != "default":
+            return None
+        if tower.archetype not in {"basic_tower", "seed_tower"}:
+            return None
+        return self._origin_edge_for_node(home_node_id)
+
+    def _tower_name_for_owner(self, owner_tower_id: str | None) -> str:
+        if owner_tower_id == "power_tower":
+            return "Power Tower"
+        tower = self.towers.get(owner_tower_id) if owner_tower_id is not None else None
+        if tower is None:
+            return "Unknown Tower"
+        return self.spec.towers[tower.archetype].name
+
+    def _mode_name_for_orb(self, orb: Orb) -> str:
+        owner_tower_id = getattr(orb, "owner_tower_id", None)
+        if owner_tower_id == "power_tower":
+            return "Power"
+        tower = self.towers.get(owner_tower_id)
+        if tower is None:
+            return "Default" if getattr(orb, "mode", "default") == "default" else "Secondary"
+        if getattr(orb, "mode", "default") == "secondary":
+            return self.secondary_mode_name_for_tower(tower)
+        return "Default"
+
+    def _record_harvest_event(self, segment_id: str, amount: int, orb: Orb) -> None:
+        tower_name = self._tower_name_for_owner(getattr(orb, "owner_tower_id", None))
+        mode_name = self._mode_name_for_orb(orb)
+        label = f"+{amount}c"
+        self.harvest_popups.append(
+            HarvestPopup(
+                segment_id=segment_id,
+                amount=amount,
+                label=label,
+                time_remaining=0.85,
+                duration=0.85,
+            )
+        )
+        self.harvest_history.append(
+            HarvestRecord(
+                timestamp=self.run_time,
+                segment_id=segment_id,
+                amount=amount,
+                owner_tower_id=getattr(orb, "owner_tower_id", None),
+                owner_hardpoint_id=getattr(orb, "owner_hardpoint_id", None),
+                tower_name=tower_name,
+                mode_name=mode_name,
+            )
+        )
+
+    def latest_harvest_event_snapshot(self, max_age: float = 4.0) -> dict[str, object] | None:
+        for record in reversed(self.harvest_history):
+            age = self.run_time - record.timestamp
+            if age > max_age:
+                break
+            return {
+                "amount": record.amount,
+                "tower_name": record.tower_name,
+                "mode_name": record.mode_name,
+                "hardpoint_id": record.owner_hardpoint_id,
+                "age": age,
+            }
+        return None
+
+    def selected_tower_economy_snapshot(self, window: float = 6.0) -> dict[str, object] | None:
+        tower = self.selected_action_tower()
+        if tower is None:
+            return None
+        tower_spec = self.spec.towers[tower.archetype]
+        recent_income = sum(
+            record.amount
+            for record in self.harvest_history
+            if record.owner_tower_id == tower.key and self.run_time - record.timestamp <= window
+        )
+        return {
+            "tower_name": tower_spec.name,
+            "mode_name": self.mode_name_for_tower(tower),
+            "shot_cost": self.shot_cost_value(tower),
+            "clean_per_unit": tower_spec.clean_per_unit_distance * self.clean_multiplier(tower),
+            "harvest_per_unit": tower_spec.harvest_per_unit_distance * self.harvest_multiplier(tower),
+            "recent_harvest_income": recent_income,
+            "window_seconds": window,
+        }
 
     def corruption_percent(self) -> float:
         numerator = 0.0
@@ -1425,5 +1638,7 @@ class GameSimulation:
             "surge_active": self.surge_time_remaining > 0,
             "level": self.level,
             "level_time_remaining": self.level_timer,
+            "recent_harvest_event": self.latest_harvest_event_snapshot(),
+            "selected_tower_economy": self.selected_tower_economy_snapshot(),
             "game_over": self.game_over,
         }

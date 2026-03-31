@@ -1,0 +1,951 @@
+{
+    "log_version": "1.0.0",
+    "project": "Gridline",
+    "purpose": "Cross-agent coordination log for planning, implementation, testing, and review handoffs.",
+    "timezone": "America/Denver",
+    "created_at": "2026-03-25T14:04:43-06:00",
+    "maintainers": [
+        "Planner",
+        "Designer",
+        "Coder",
+        "Reviewer",
+        "Tester",
+        "AssetCreator"
+    ],
+    "entry_schema_notes": {
+        "entry_id": "Unique ID per log event",
+        "agent": "Agent role writing the entry",
+        "timestamp": "ISO-8601 with timezone offset",
+        "status": "completed | partial | blocked",
+        "looked_at": "Files/context reviewed before acting",
+        "intent": "What the agent intended to do",
+        "updates_made": "Concrete files changed and summary",
+        "next_step_suggestions": "Actionable handoff suggestions for next agent"
+    },
+    "entries": [
+        {
+            "entry_id": "coder-20260325-008",
+            "agent": "Coder",
+            "timestamp": "2026-03-25T21:04:13.5573252-06:00",
+            "status": "completed",
+            "looked_at": [
+                "agent_log.json",
+                "Coder_Prompt.md",
+                "Designer_Prompt.md",
+                "Planner_Prompt.md",
+                "Tester_Prompt.md"
+            ],
+            "intent": [
+                "Align all agent prompt files on a shared terminal-output rule for file references.",
+                "Ensure future agents mention repo-relative file paths in user-facing responses instead of absolute filesystem paths."
+            ],
+            "updates_made": [
+                {
+                    "file": "Coder_Prompt.md",
+                    "change_type": "updated",
+                    "summary": "Added a constraint requiring repo-root-relative file references in terminal responses to the user."
+                },
+                {
+                    "file": "Designer_Prompt.md",
+                    "change_type": "updated",
+                    "summary": "Added a constraint requiring repo-root-relative file references in terminal responses to the user."
+                },
+                {
+                    "file": "Planner_Prompt.md",
+                    "change_type": "updated",
+                    "summary": "Added a constraint requiring repo-root-relative file references in terminal responses to the user."
+                },
+                {
+                    "file": "Tester_Prompt.md",
+                    "change_type": "updated",
+                    "summary": "Added a constraint requiring repo-root-relative file references in terminal responses to the user."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Logged the shared prompt-rule update so future agents can follow one consistent file-reference convention in terminal output."
+                }
+            ],
+            "next_step_suggestions": [
+                "All agents: when mentioning files to the user in terminal output, use repo-root-relative paths such as `gridline/app.py` or `QA_TRACKER.md` instead of absolute machine-local paths.",
+                "Coder/Designer/Planner/Tester: keep this wording synchronized if new prompt files are added later so file-reference behavior stays consistent across roles."
+            ]
+        },
+        {
+            "entry_id": "coder-20260326-001",
+            "agent": "Coder",
+            "timestamp": "2026-03-26T12:08:18.8224118-06:00",
+            "status": "completed",
+            "looked_at": [
+                "Coder_Prompt.md",
+                "REPO_DOC_GUIDELINES.md",
+                "CURRENT_HANDOFFS.md",
+                "CODER_PROJECT_GUIDE.md",
+                "game_summary.md",
+                "Game_Design.md",
+                "QA_TRACKER.md",
+                "agent_log.json",
+                "gridline/app.py",
+                "tests/test_simulation.py"
+            ],
+            "intent": [
+                "Begin the currently handed-off coder tasks for corruption seeder telegraphing and the right-sidebar layout.",
+                "Verify whether those tasks still required implementation work before changing runtime code."
+            ],
+            "updates_made": [
+                {
+                    "file": "CURRENT_HANDOFFS.md",
+                    "change_type": "updated",
+                    "summary": "Cleared the stale active handoff for `BUG-010` and the sidebar refactor after verifying both are already implemented and reflected in current QA documents."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Logged the verification pass so future agents do not reopen already-completed seeder/sidebar work from an outdated handoff."
+                }
+            ],
+            "next_step_suggestions": [
+                "Coder: continue with the remaining live-play verification queue in `CODER_PROJECT_GUIDE.md`, starting with `OBJ-004` through `OBJ-008`.",
+                "Tester/Reviewer: focus on the remaining `verify_fix` gameplay items in `QA_TRACKER.md` rather than re-running the completed seeder/sidebar pass."
+            ]
+        },
+        {
+            "entry_id": "tester-20260326-001",
+            "agent": "Tester",
+            "timestamp": "2026-03-26T12:46:00-06:00",
+            "status": "partial",
+            "looked_at": [
+                "Tester_Prompt.md",
+                "REPO_DOC_GUIDELINES.md",
+                "CURRENT_HANDOFFS.md",
+                "game_summary.md",
+                "Game_Design.md",
+                "QA_TRACKER.md",
+                "agent_log.json",
+                "gridline/simulation.py",
+                "gridline/app.py",
+                "tests/test_simulation.py"
+            ],
+            "intent": [
+                "Execute the remaining open verification items in `QA_TRACKER.md` for `OBJ-004` through `OBJ-008`.",
+                "Separate fixes that are genuinely closed from fixes that still fail under targeted edge-case testing."
+            ],
+            "updates_made": [
+                {
+                    "file": "QA_TRACKER.md",
+                    "change_type": "updated",
+                    "summary": "Marked `OBJ-007` and `OBJ-008` as pass, kept `OBJ-005` and `OBJ-006` partial after failed edge-case retests, and added new follow-up bugs `BUG-011` and `BUG-012` for power-state restoration and secondary-mode UI naming."
+                },
+                {
+                    "file": "CURRENT_HANDOFFS.md",
+                    "change_type": "updated",
+                    "summary": "Replaced the stale tester handoff with the current coder follow-up queue: remaining Seed landing failure, suspended-tower cooldown restoration, and explicit secondary-mode naming."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Logged the mixed verification result so future agents can distinguish passed gameplay fixes from the still-open Seed/power/UI defects."
+                }
+            ],
+            "next_step_suggestions": [
+                "Coder: fix `BUG-001` by ensuring Seed landing targets always resolve to an intersection that can emit an orb for the current traversal tier, including `Recall Mode`.",
+                "Coder: fix `BUG-011` by freezing and restoring suspended tower cooldown/readiness state during power override instead of letting timers advance underneath the override.",
+                "Coder: fix `BUG-012` by surfacing explicit `Guard Mode`, `Recall Mode`, and `Focus Mode` labels in selected-object text and action labels, then return those items to tester for re-verification."
+            ]
+        },
+        {
+            "entry_id": "coder-20260326-002",
+            "agent": "Coder",
+            "timestamp": "2026-03-26T13:14:19.8424045-06:00",
+            "status": "completed",
+            "looked_at": [
+                "CURRENT_HANDOFFS.md",
+                "QA_TRACKER.md",
+                "CODER_PROJECT_GUIDE.md",
+                "Game_Design.md",
+                "gridline/simulation.py",
+                "gridline/app.py",
+                "tests/test_simulation.py"
+            ],
+            "intent": [
+                "Take the next active coder handoff after the seeder/sidebar pass by fixing seed landing reliability, suspended tower cooldown restoration during power override, and explicit secondary-mode HUD naming.",
+                "Re-queue the affected objectives for tester verification with regression coverage."
+            ],
+            "updates_made": [
+                {
+                    "file": "gridline/simulation.py",
+                    "change_type": "updated",
+                    "summary": "Resolved seed landing targets onto emit-capable nodes before launch, froze suspended tower cooldown timers during active power override, and exposed explicit named secondary-mode strings in selected-object snapshots."
+                },
+                {
+                    "file": "gridline/app.py",
+                    "change_type": "updated",
+                    "summary": "Changed sidebar tower details and contextual action labels to use explicit secondary-mode names such as `Recall Mode` instead of generic `secondary` wording."
+                },
+                {
+                    "file": "tests/test_simulation.py",
+                    "change_type": "updated",
+                    "summary": "Added regressions for reliable Seed/Recall orb release, power-override cooldown freezing, and named secondary-mode text in the sidebar."
+                },
+                {
+                    "file": "QA_TRACKER.md",
+                    "change_type": "updated",
+                    "summary": "Moved `OBJ-004`, `OBJ-005`, `OBJ-006`, `BUG-001`, `BUG-011`, and `BUG-012` to `verify_fix` for tester revalidation after the latest coder pass."
+                },
+                {
+                    "file": "CURRENT_HANDOFFS.md",
+                    "change_type": "updated",
+                    "summary": "Replaced the prior coder work items with a clean tester handoff for the newly patched Seed, power-override, and HUD-naming fixes."
+                }
+            ],
+            "next_step_suggestions": [
+                "Tester: re-run `OBJ-005` / `BUG-001` in both default Seed mode and `Recall Mode` to confirm every completed seed flight releases an orb at landing.",
+                "Tester: re-run `OBJ-006` / `BUG-011` by deploying power onto a tower that already has non-zero fire and swap cooldowns, then confirm both values are unchanged on restoration.",
+                "Tester: re-run `OBJ-004` / `BUG-012` across archetypes to confirm the selected-object panel and contextual action labels use explicit fixed mode names such as `Guard Mode`, `Recall Mode`, and `Focus Mode`.",
+                "Tester/Reviewer: `python -m pytest tests/test_simulation.py -q` passed on March 26, 2026 with 21 tests; only pytest cache warnings were emitted because local cache writes are restricted in this workspace."
+            ]
+        },
+        {
+            "entry_id": "tester-20260326-002",
+            "agent": "Tester",
+            "timestamp": "2026-03-26T13:27:58.2507570-06:00",
+            "status": "completed",
+            "looked_at": [
+                "CURRENT_HANDOFFS.md",
+                "QA_TRACKER.md",
+                "agent_log.json",
+                "gridline/simulation.py",
+                "gridline/app.py",
+                "tests/test_simulation.py"
+            ],
+            "intent": [
+                "Re-run the latest Seed landing, power-override restoration, and secondary-mode naming fixes after the coder pass.",
+                "Close the re-queued objectives and bugs if the current runtime and regression suite satisfy the approved behavior."
+            ],
+            "updates_made": [
+                {
+                    "file": "QA_TRACKER.md",
+                    "change_type": "updated",
+                    "summary": "Marked `OBJ-004`, `OBJ-005`, `OBJ-006`, `BUG-001`, `BUG-011`, and `BUG-012` as `pass` after re-verifying the current runtime/test state."
+                },
+                {
+                    "file": "CURRENT_HANDOFFS.md",
+                    "change_type": "updated",
+                    "summary": "Cleared the active Seed/power/mode-name verification handoff and redirected the next QA focus to the remaining smoke-test objective."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Logged the completed tester verification pass so future agents treat the Seed, power-restore, and explicit mode-name fixes as closed."
+                }
+            ],
+            "next_step_suggestions": [
+                "Tester: continue with `OBJ-001` end-to-end smoke testing in `QA_TRACKER.md`, including app boot, stability, `Esc` quit, and fullscreen toggle.",
+                "Coder: only reopen the just-closed Seed/power/mode-name area if smoke testing or live play exposes a new regression.",
+                "Reviewer: treat the current regression suite baseline as 21 passing tests; the only observed warnings were pytest cache write restrictions in this workspace."
+            ]
+        },
+        {
+            "entry_id": "tester-20260327-001",
+            "agent": "Tester",
+            "timestamp": "2026-03-27T00:00:00-06:00",
+            "status": "completed",
+            "looked_at": [
+                "CURRENT_HANDOFFS.md",
+                "REPO_DOC_GUIDELINES.md",
+                "QA_TRACKER.md",
+                "agent_log.json",
+                "main.py",
+                "gridline/app.py"
+            ],
+            "intent": [
+                "Process the active tester mailbox instruction from Planner.",
+                "Complete `OBJ-001` by smoke-testing app launch, HUD visibility, fullscreen toggle, `Esc` quit, and immediate runtime stability."
+            ],
+            "updates_made": [
+                {
+                    "file": "QA_TRACKER.md",
+                    "change_type": "updated",
+                    "summary": "Marked `OBJ-001` as `pass` after a brief GUI smoke test verified boot, HUD visibility, fullscreen toggle, and `Esc` quit without immediate runtime errors."
+                },
+                {
+                    "file": "CURRENT_HANDOFFS.md",
+                    "change_type": "updated",
+                    "summary": "Cleared the processed tester inbox entry and updated the User/Project Owner section to reflect that the MVP smoke-test queue is complete."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Logged the completed smoke-test verification milestone so future agents can treat `OBJ-001` as closed."
+                }
+            ],
+            "next_step_suggestions": [
+                "Planner: review the now-passed MVP verification queue and decide the next milestone, scope expansion, or polish handoff.",
+                "Coder: hold unless a new task is assigned or a later playtest uncovers a regression.",
+                "Tester/Reviewer: the current smoke-test baseline passed for boot, HUD visibility, fullscreen toggle, and `Esc` quit."
+            ]
+        },
+        {
+            "entry_id": "planner-20260327-001",
+            "agent": "Planner",
+            "timestamp": "2026-03-27T12:52:40.5126115-06:00",
+            "status": "completed",
+            "looked_at": [
+                "CURRENT_HANDOFFS.md",
+                "game_summary.md",
+                "QA_TRACKER.md",
+                "agent_log.json"
+            ],
+            "intent": [
+                "Review the now-passed MVP verification queue and decide the next project milestone.",
+                "Prevent post-MVP drift by locking the next phase to tuning and playtest-readiness instead of feature expansion."
+            ],
+            "updates_made": [
+                {
+                    "file": "game_summary.md",
+                    "change_type": "updated",
+                    "summary": "Added a planner-owned current milestone section defining the next phase as a post-MVP tuning pass focused on pacing, economy, role clarity, power-tower balance, and polish without expanding major scope."
+                },
+                {
+                    "file": "CURRENT_HANDOFFS.md",
+                    "change_type": "updated",
+                    "summary": "Updated the User/Project Owner summary and handed Designer a mailbox task to translate the new post-MVP tuning milestone into concrete `Game_Design.md` guidance."
+                }
+            ],
+            "next_step_suggestions": [
+                "Designer: update `Game_Design.md` with concrete tuning and playtest-evaluation guidance for the new post-MVP phase, especially run pacing, economy pressure, tower-role separation, secondary-mode tradeoffs, and power-tower usage.",
+                "Coder: hold on new feature work until the design tuning pass lands, then implement only the highest-value tuning or polish changes from that pass.",
+                "Tester/Reviewer: after the design tuning pass and any resulting code changes, evaluate longer live-play sessions against the 10 to 15 minute survival target and the clarified readability/polish priorities."
+            ]
+        },
+        {
+            "entry_id": "designer-20260327-001",
+            "agent": "Designer",
+            "timestamp": "2026-03-27T12:57:28.3375492-06:00",
+            "status": "completed",
+            "looked_at": [
+                "CURRENT_HANDOFFS.md",
+                "REPO_DOC_GUIDELINES.md",
+                "game_summary.md",
+                "Game_Design.md",
+                "agent_log.json"
+            ],
+            "intent": [
+                "Translate the planner's new post-MVP tuning milestone into concrete implementation-ready design guidance.",
+                "Define explicit playtest evaluation targets for pacing, economy pressure, tower-role separation, secondary-mode tradeoffs, power-tower usage, and high-value readability/usability polish without expanding scope."
+            ],
+            "updates_made": [
+                {
+                    "file": "Game_Design.md",
+                    "change_type": "updated",
+                    "summary": "Added a post-MVP tuning pass specification with concrete targets, playtest metrics, evaluation flow, and scope limits for pacing, economy, role separation, secondary-mode tradeoffs, power-tower usage, and readability/usability polish."
+                },
+                {
+                    "file": "CURRENT_HANDOFFS.md",
+                    "change_type": "updated",
+                    "summary": "Cleared the processed Designer inbox item, updated the User/Project Owner summary, and handed Coder the new post-MVP tuning implementation pass."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Logged the designer translation of the planner milestone so future agents can treat the post-MVP tuning guidance in `Game_Design.md` as the active durable design authority."
+                }
+            ],
+            "next_step_suggestions": [
+                "Coder: read the new post-MVP tuning section in `Game_Design.md` and implement the highest-value existing-system tuning, readability, and usability changes first without adding new systems.",
+                "Tester/Reviewer: after the next coder pass, evaluate longer live-play sessions against the 10 to 15 minute target, economy forgiveness, role clarity, secondary-mode usefulness, power-tower usage, and required readability cues.",
+                "Planner: reopen only if playtest evidence shows the tuning pass cannot solve a problem without adding scope."
+            ]
+        },
+        {
+            "entry_id": "coder-20260327-001",
+            "agent": "Coder",
+            "timestamp": "2026-03-27T14:03:57.9987417-06:00",
+            "status": "completed",
+            "looked_at": [
+                "CURRENT_HANDOFFS.md",
+                "REPO_DOC_GUIDELINES.md",
+                "Game_Design.md",
+                "gridline/app.py",
+                "tests/test_simulation.py",
+                "agent_log.json"
+            ],
+            "intent": [
+                "Take the first Section 20 post-MVP tuning pass by implementing the highest-value readability and usability improvements inside existing systems.",
+                "Improve decision speed and power-state clarity without expanding gameplay scope or introducing new major systems."
+            ],
+            "updates_made": [
+                {
+                    "file": "gridline/app.py",
+                    "change_type": "updated",
+                    "summary": "Improved empty-hardpoint decision support with tower role/cost summaries, added clearer power funding/ready/active HUD text, and updated build/power action labels to surface cost and state more explicitly."
+                },
+                {
+                    "file": "tests/test_simulation.py",
+                    "change_type": "updated",
+                    "summary": "Added regression checks for the new empty-hardpoint build guidance and clearer power funding/ready status text in the sidebar."
+                },
+                {
+                    "file": "CURRENT_HANDOFFS.md",
+                    "change_type": "updated",
+                    "summary": "Cleared the processed Coder inbox item, updated the User/Project Owner summary, and handed Tester a mailbox task to verify the first Section 20 readability/usability pass in live play."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Logged the first post-MVP coder tuning pass so future agents can distinguish this scoped readability/usability work from broader balance tuning that still needs playtest evidence."
+                }
+            ],
+            "next_step_suggestions": [
+                "Tester: verify in live play that empty hardpoints now communicate tower roles and costs clearly enough for faster build decisions, and that power funding, ready, and active states remain easy to read in both the HUD and action labels.",
+                "Reviewer: inspect this pass as a narrow Section 20 usability/readability change, not as a balance rewrite. The main question is whether the new labels improve decision speed without cluttering the sidebar.",
+                "Coder: wait for live-play findings before changing pacing, economy, or role-balance values; Section 20 still requires evidence before numeric tuning."
+            ]
+        },
+        {
+            "entry_id": "tester-20260327-002",
+            "agent": "Tester",
+            "timestamp": "2026-03-27T14:20:00.3795274-06:00",
+            "status": "completed",
+            "looked_at": [
+                "CURRENT_HANDOFFS.md",
+                "REPO_DOC_GUIDELINES.md",
+                "game_summary.md",
+                "Game_Design.md",
+                "QA_TRACKER.md",
+                "agent_log.json",
+                "gridline/app.py",
+                "tests/test_simulation.py"
+            ],
+            "intent": [
+                "Process the active tester mailbox instruction from Coder for the first Section 20 readability/usability pass.",
+                "Verify in live UI that empty hardpoint build decisions and power funding/deployment states now read clearly enough for faster decisions."
+            ],
+            "updates_made": [
+                {
+                    "file": "CURRENT_HANDOFFS.md",
+                    "change_type": "updated",
+                    "summary": "Cleared the processed tester inbox, removed the coder wait state, and updated the User/Project Owner section to reflect that the first Section 20 readability/usability pass was verified in live UI."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Logged the completed Section 20 readability/usability verification milestone so future agents can treat the first build-role/power-state feedback pass as tester-approved."
+                }
+            ],
+            "next_step_suggestions": [
+                "Planner: review the now-verified first Section 20 readability/usability pass and decide the next tuning batch or milestone handoff.",
+                "Coder: hold unless a new tuning task is handed down or later live play uncovers another existing-system clarity gap.",
+                "Tester/Reviewer: the verified UI signals for this pass are empty-hardpoint build-role/cost summaries plus clear power `FUNDING`, `READY`, and `ACTIVE` state wording."
+            ]
+        },
+        {
+            "entry_id": "planner-20260327-002",
+            "agent": "Planner",
+            "timestamp": "2026-03-27T14:27:48.3075457-06:00",
+            "status": "completed",
+            "looked_at": [
+                "CURRENT_HANDOFFS.md",
+                "Planner_Prompt.md",
+                "game_summary.md",
+                "Game_Design.md",
+                "QA_TRACKER.md",
+                "agent_log.json"
+            ],
+            "intent": [
+                "Review the verified first Section 20 readability/usability pass and decide the next tuning batch.",
+                "Prevent speculative coder churn by requiring the next pass to produce live-play evidence before more tuning changes are assigned."
+            ],
+            "updates_made": [
+                {
+                    "file": "game_summary.md",
+                    "change_type": "updated",
+                    "summary": "Refined the current milestone to make the next batch an evidence-first live-play evaluation and explicitly held further coder tuning until concrete playtest findings exist."
+                },
+                {
+                    "file": "CURRENT_HANDOFFS.md",
+                    "change_type": "updated",
+                    "summary": "Cleared the processed Planner inbox, updated the User/Project Owner summary, and handed Tester the next evidence-gathering pass across pacing, economy, role clarity, mode usefulness, power-tower usage, and remaining readability/usability friction."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Logged the batch change so future agents treat longer live-play evidence gathering as the active post-MVP priority."
+                }
+            ],
+            "next_step_suggestions": [
+                "Tester: run longer live-play sessions and record concrete findings against the post-MVP tuning goals in `game_summary.md` and `Game_Design.md` before any new coder pass is assigned.",
+                "Designer: hold unless tester findings show the current Section 20 tuning guidance needs clarification or reprioritization.",
+                "Coder: hold unless tester findings surface a concrete existing-system tuning issue that should become the next scoped implementation pass."
+            ]
+        },
+        {
+            "entry_id": "tester-20260327-003",
+            "agent": "Tester",
+            "timestamp": "2026-03-27T14:36:37.8166194-06:00",
+            "status": "completed",
+            "looked_at": [
+                "CURRENT_HANDOFFS.md",
+                "REPO_DOC_GUIDELINES.md",
+                "game_summary.md",
+                "Game_Design.md",
+                "QA_TRACKER.md",
+                "agent_log.json",
+                "gridline/simulation.py"
+            ],
+            "intent": [
+                "Process the active tester mailbox instruction for the first evidence-first Section 20 live-play batch.",
+                "Gather concrete pacing, economy, role-separation, secondary-mode, power-tower, and readability/usability findings before another coder tuning pass."
+            ],
+            "updates_made": [
+                {
+                    "file": "QA_TRACKER.md",
+                    "change_type": "updated",
+                    "summary": "Added `OBJ-013`, `OBJ-014`, `BUG-013`, and `BUG-014` to capture the new Section 20 findings: catastrophic opener-pressure collapse and blocked secondary/power evaluation."
+                },
+                {
+                    "file": "CURRENT_HANDOFFS.md",
+                    "change_type": "updated",
+                    "summary": "Cleared the processed tester inbox, updated the User/Project Owner summary, and handed Planner the evidence-first Section 20 findings for the next tuning response."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Logged the first longer Section 20 live-play evidence batch so future agents can act on concrete pacing/economy failures instead of speculative tuning guesses."
+                }
+            ],
+            "next_step_suggestions": [
+                "Planner: review `QA_TRACKER.md` entries `OBJ-013`, `OBJ-014`, `BUG-013`, and `BUG-014` and decide the next tuning response to the opener-pressure/economy collapse.",
+                "Coder: hold until Planner reviews the evidence, then take the smallest existing-system tuning pass that addresses the new `P0` pacing failure first.",
+                "Designer: hold unless the Planner wants Section 20 reprioritized or clarified after reviewing the evidence."
+            ]
+        },
+        {
+            "entry_id": "planner-20260327-003",
+            "agent": "Planner",
+            "timestamp": "2026-03-27T14:41:28.6725824-06:00",
+            "status": "completed",
+            "looked_at": [
+                "CURRENT_HANDOFFS.md",
+                "Planner_Prompt.md",
+                "game_summary.md",
+                "Game_Design.md",
+                "QA_TRACKER.md",
+                "agent_log.json"
+            ],
+            "intent": [
+                "Review the first Section 20 live-play evidence batch and decide the next tuning response to the catastrophic opener-pressure findings.",
+                "Prevent the post-MVP tuning pass from drifting into broad balance work before the build survives long enough for meaningful evaluation."
+            ],
+            "updates_made": [
+                {
+                    "file": "game_summary.md",
+                    "change_type": "updated",
+                    "summary": "Reframed the current milestone around an emergency opener-stabilization batch, prioritizing early survivability and economy breathing room before broader post-MVP tuning lanes reopen."
+                },
+                {
+                    "file": "CURRENT_HANDOFFS.md",
+                    "change_type": "updated",
+                    "summary": "Cleared the processed Planner inbox, updated the User/Project Owner summary, and handed Designer a mailbox task to reprioritize Section 20 around the new `P0` opener-stabilization blocker."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Logged the shift from generic evidence-first tuning to an emergency opener-stabilization batch so future agents treat `BUG-013` as the active gating problem."
+                }
+            ],
+            "next_step_suggestions": [
+                "Designer: update `Game_Design.md` so the next coder pass is explicitly scoped around opener stabilization, early economy breathing room, and the blocked status of secondary-mode/power evaluation.",
+                "Coder: hold until the design reprioritization lands, then take the smallest existing-system tuning pass that addresses `BUG-013` first.",
+                "Tester/Reviewer: after the next coder pass, re-run `OBJ-013` before reopening `OBJ-014` or broader Section 20 evaluation."
+            ]
+        },
+        {
+            "entry_id": "designer-20260327-002",
+            "agent": "Designer",
+            "timestamp": "2026-03-27T14:48:38.7614716-06:00",
+            "status": "completed",
+            "looked_at": [
+                "CURRENT_HANDOFFS.md",
+                "REPO_DOC_GUIDELINES.md",
+                "game_summary.md",
+                "Game_Design.md",
+                "QA_TRACKER.md",
+                "agent_log.json"
+            ],
+            "intent": [
+                "Reprioritize `Game_Design.md` after the first Section 20 live-play batch exposed a `P0` opener-stabilization failure.",
+                "Convert the planner's emergency batch direction into explicit gating rules so the next coder pass targets early survivability and economy breathing room before broader tuning resumes."
+            ],
+            "updates_made": [
+                {
+                    "file": "Game_Design.md",
+                    "change_type": "updated",
+                    "summary": "Reprioritized Section 20 around `BUG-013`, added opener-stabilization gating criteria and evidence references, and explicitly blocked secondary-mode and power-tower evaluation until runs survive long enough for meaningful judgment."
+                },
+                {
+                    "file": "CURRENT_HANDOFFS.md",
+                    "change_type": "updated",
+                    "summary": "Cleared the processed Designer inbox item, updated the User/Project Owner summary, and handed Coder the scoped opener-stabilization pass."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Logged the Section 20 reprioritization so future agents treat opener stabilization as the active gating design authority for the next tuning pass."
+                }
+            ],
+            "next_step_suggestions": [
+                "Coder: use the revised Section 20 guidance in `Game_Design.md` to take the smallest existing-system pass that stops the observed `12.0` to `14.3` second opener collapse and restores the minute-2 economy checkpoint as a reachable target.",
+                "Tester/Reviewer: after the next coder pass, re-run `OBJ-013` first and keep `OBJ-014` blocked until the opener survives long enough for later-use systems to be judged meaningfully.",
+                "Planner: reopen only if opener stabilization still appears impossible without adding scope beyond the existing systems."
+            ]
+        },
+        {
+            "entry_id": "coder-20260327-002",
+            "agent": "Coder",
+            "timestamp": "2026-03-27T15:08:24.3872838-06:00",
+            "status": "completed",
+            "looked_at": [
+                "CURRENT_HANDOFFS.md",
+                "Game_Design.md",
+                "QA_TRACKER.md",
+                "agent_log.json",
+                "game_config.json",
+                "tests/test_simulation.py"
+            ],
+            "intent": [
+                "Take the first emergency opener-stabilization pass for `BUG-013` using the smallest existing-system lever that affects the first 60 to 120 seconds.",
+                "Restore the minute-2 checkpoint as a reachable target without reopening broader Section 20 balance lanes."
+            ],
+            "updates_made": [
+                {
+                    "file": "game_config.json",
+                    "change_type": "updated",
+                    "summary": "Raised `corruption.base_spread_interval_seconds` from `5` to `8` as a narrow opener-pressure reduction aimed at slowing early corruption snowball without changing later blocked systems directly."
+                },
+                {
+                    "file": "tests/test_simulation.py",
+                    "change_type": "updated",
+                    "summary": "Added a regression that runs the known `basic_only`, `mixed_three`, and `upgrade_first` opener styles against the live config and asserts survival to the minute-2 checkpoint window."
+                },
+                {
+                    "file": "QA_TRACKER.md",
+                    "change_type": "updated",
+                    "summary": "Moved `OBJ-013` and `BUG-013` to `verify_fix`, kept `OBJ-014` blocked, and updated the bug notes to reflect the scoped opener-stabilization pass."
+                },
+                {
+                    "file": "CURRENT_HANDOFFS.md",
+                    "change_type": "updated",
+                    "summary": "Cleared the processed Coder inbox item, updated the User/Project Owner summary, and handed Tester the opener-stabilization retest for `OBJ-013` / `BUG-013`."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Logged the first opener-stabilization code pass so future agents can distinguish this narrow early-pressure tuning from the still-blocked later Section 20 lanes."
+                }
+            ],
+            "next_step_suggestions": [
+                "Tester: re-run `OBJ-013` / `BUG-013` in live play and confirm the build no longer collapses in seconds and that the minute-2 checkpoint is reachable again before reopening `OBJ-014`.",
+                "Reviewer: inspect this pass as a narrow opener-pressure change centered on early corruption timing, not as a broad rebalance of later systems.",
+                "Coder: hold broader Section 20 tuning until tester either verifies the opener fix or returns fresh evidence showing which early-pressure lever still fails."
+            ]
+        },
+        {
+            "entry_id": "tester-20260327-003",
+            "agent": "Tester",
+            "timestamp": "2026-03-27T16:08:38.8260143-06:00",
+            "status": "completed",
+            "looked_at": [
+                "CURRENT_HANDOFFS.md",
+                "game_summary.md",
+                "Game_Design.md",
+                "QA_TRACKER.md",
+                "agent_log.json",
+                "tests/test_simulation.py",
+                "game_config.json"
+            ],
+            "intent": [
+                "Re-run `OBJ-013` / `BUG-013` after the first opener-stabilization pass and verify the build no longer collapses in seconds.",
+                "Decide whether the minute-2 checkpoint is reachable again often enough to reopen the blocked `OBJ-014` evaluation lane."
+            ],
+            "updates_made": [
+                {
+                    "file": "QA_TRACKER.md",
+                    "change_type": "updated",
+                    "summary": "Closed `BUG-013` as passed, moved `OBJ-013` back to active evaluation, and reopened `OBJ-014` / `BUG-014` now that the longer-run test window is available again."
+                },
+                {
+                    "file": "CURRENT_HANDOFFS.md",
+                    "change_type": "updated",
+                    "summary": "Cleared the processed Tester inbox, updated the User/Project Owner summary, and set the next tester action to resume broader Section 20 follow-on testing."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Logged the opener-stabilization verification evidence so future agents can distinguish the closed instant-collapse blocker from the still-open broader pacing and viability evaluation."
+                }
+            ],
+            "next_step_suggestions": [
+                "Tester: resume `OBJ-014` and gather fresh evidence on secondary-mode usefulness, power-tower usage, and later-run readability now that minute-2 is reachable again.",
+                "Planner: stay idle unless renewed Section 20 evidence shows the reopened longer-run lane still cannot produce meaningful evaluation.",
+                "Coder: hold further opener tuning unless a new tester batch shows minute-2 regressions or exposes a different concrete early-pressure blocker."
+            ]
+        },
+        {
+            "entry_id": "planner-20260327-004",
+            "agent": "Planner",
+            "timestamp": "2026-03-27T16:16:47.3799212-06:00",
+            "status": "completed",
+            "looked_at": [
+                "CURRENT_HANDOFFS.md",
+                "Play_Tester_Notes.md",
+                "game_summary.md",
+                "QA_TRACKER.md",
+                "agent_log.json"
+            ],
+            "intent": [
+                "Perform the first planner triage pass on the new raw playtest feedback.",
+                "Separate already-tracked issues from new planner-approved constraints before any coder-facing work is assigned."
+            ],
+            "updates_made": [
+                {
+                    "file": "game_summary.md",
+                    "change_type": "updated",
+                    "summary": "Added planner-approved triage priorities covering build-control reachability, stronger orb/harvest feedback, tester-facing economy clarity, interior-grid influence expectations for `Basic Tower` and `Seed Tower`, deferral of hardpoint-count changes until behavior is evaluated, and the lower immediate priority of orb/trail finish polish."
+                },
+                {
+                    "file": "CURRENT_HANDOFFS.md",
+                    "change_type": "updated",
+                    "summary": "Updated the User/Project Owner summary and handed Designer a mailbox task to convert the raw playtest triage into implementation-ready `Game_Design.md` guidance."
+                }
+            ],
+            "next_step_suggestions": [
+                "Designer: translate the triaged `Play_Tester_Notes.md` items into coder-ready design logic, separating regressions, active readability/economy-feedback needs, interior-pathing expectations, and deferred visual polish.",
+                "Tester: keep `Play_Tester_Notes.md` as raw intake and continue routing reproducible failures into `QA_TRACKER.md` once they are validated against the current build.",
+                "Coder: wait for the design translation pass before taking any new work from the raw playtest notes directly."
+            ]
+        },
+        {
+            "entry_id": "designer-20260327-003",
+            "agent": "Designer",
+            "timestamp": "2026-03-27T16:27:23.1168296-06:00",
+            "status": "completed",
+            "looked_at": [
+                "CURRENT_HANDOFFS.md",
+                "REPO_DOC_GUIDELINES.md",
+                "Play_Tester_Notes.md",
+                "game_summary.md",
+                "Game_Design.md",
+                "agent_log.json"
+            ],
+            "intent": [
+                "Translate the planner-triaged `Play_Tester_Notes.md` feedback into implementation-ready design changes in `Game_Design.md`.",
+                "Separate active usability, readability, economy, and pathing requirements from deferred hardpoint and later visual-polish work before handing the next pass to Coder."
+            ],
+            "updates_made": [
+                {
+                    "file": "Game_Design.md",
+                    "change_type": "updated",
+                    "summary": "Added concrete design rules for empty-hardpoint build-control reachability, stronger real-state orb and harvest-result feedback, tester-facing economy clarity, and interior-grid influence from default `Basic Tower` and `Seed Tower`, while deferring hardpoint-count expansion and smoothing-only visual polish."
+                },
+                {
+                    "file": "CURRENT_HANDOFFS.md",
+                    "change_type": "updated",
+                    "summary": "Cleared the processed Designer inbox item, updated the User/Project Owner summary, and replaced the stale Coder hold message with a concrete implementation handoff derived from the triaged playtester notes."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Logged the design translation of the planner triage so future agents can treat the new `Game_Design.md` guidance as the durable coder-facing interpretation of the raw playtester notes."
+                }
+            ],
+            "next_step_suggestions": [
+                "Coder: implement the new `Game_Design.md` guidance for build-control reachability, real-state orb/harvest feedback, tester-facing economy clarity, and default `Basic Tower` / `Seed Tower` interior influence before considering deferred hardpoint or smoothing-only visual work.",
+                "Tester: keep `Play_Tester_Notes.md` as raw intake, and after the next coder pass validate the new reachability, feedback, economy-clarity, and interior-influence expectations against the live build.",
+                "Planner: revisit hardpoint-count expansion only after pathing/emission behavior is corrected enough to show whether topology is still the limiting factor."
+            ]
+        },
+        {
+            "entry_id": "coder-20260327-004",
+            "agent": "Coder",
+            "timestamp": "2026-03-27T17:40:53.1588424-06:00",
+            "status": "completed",
+            "looked_at": [
+                "CURRENT_HANDOFFS.md",
+                "CODER_PROJECT_GUIDE.md",
+                "game_summary.md",
+                "Game_Design.md",
+                "QA_TRACKER.md",
+                "agent_log.json",
+                "Play_Tester_Notes.md",
+                "gridline/simulation.py",
+                "gridline/app.py",
+                "tests/test_simulation.py"
+            ],
+            "intent": [
+                "Take the designer handoff derived from `Play_Tester_Notes.md` by fixing empty-hardpoint build-control reachability, stronger orb/harvest-result feedback, tester-facing economy clarity, and default `Basic Tower` / `Seed Tower` interior influence.",
+                "Return the new usability/readability/pathing pass to Tester with concrete regressions and QA targets."
+            ],
+            "updates_made": [
+                {
+                    "file": "gridline/simulation.py",
+                    "change_type": "updated",
+                    "summary": "Added attributed harvest event tracking, recent selected-tower economy snapshots, local harvest popups, and interior-bias target/path rules for default `Basic Tower` and `Seed Tower` while preserving the existing minute-2 checkpoint regression."
+                },
+                {
+                    "file": "gridline/app.py",
+                    "change_type": "updated",
+                    "summary": "Reset the contextual action region to the build controls on empty-hardpoint selection, surfaced recent-harvest status plus selected-tower economy telemetry in the sidebar, and rendered floating local `+coins` harvest cues on the playfield."
+                },
+                {
+                    "file": "tests/test_simulation.py",
+                    "change_type": "updated",
+                    "summary": "Added regressions for attributed harvest feedback, empty-hardpoint action reset, default `Basic Tower` inward-turn bias, default `Seed Tower` interior target preference, and kept the minute-2 opener checkpoint passing."
+                },
+                {
+                    "file": "QA_TRACKER.md",
+                    "change_type": "updated",
+                    "summary": "Added `OBJ-015` plus `BUG-015` through `BUG-017` as `verify_fix` targets for the new usability/readability/interior-influence pass."
+                },
+                {
+                    "file": "CURRENT_HANDOFFS.md",
+                    "change_type": "updated",
+                    "summary": "Cleared the processed Coder inbox, updated the User/Project Owner summary, and handed Tester a concrete verification pass for the new playtester-followup changes."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Logged the coder implementation pass so future agents can distinguish the new playtester-followup fixes from the earlier opener-stabilization work."
+                }
+            ],
+            "next_step_suggestions": [
+                "Tester: verify `OBJ-015` plus `BUG-015`, `BUG-016`, and `BUG-017` in live play, including constrained-window build-control reachability, local harvest readability, and default `Basic Tower` / `Seed Tower` interior influence.",
+                "Tester: keep the minute-2 opener checkpoint in view while validating the new pathing rules so the playtester-followup pass does not silently regress `OBJ-013`.",
+                "Planner/Designer: hold hardpoint-count expansion and smoothing-only orb/trail polish until tester evidence shows whether the new behavior pass resolves the underlying usability and coverage complaints."
+            ]
+        },
+        {
+            "entry_id": "tester-20260327-004",
+            "agent": "Tester",
+            "timestamp": "2026-03-27T17:52:19.1494836-06:00",
+            "status": "completed",
+            "looked_at": [
+                "CURRENT_HANDOFFS.md",
+                "QA_TRACKER.md",
+                "Game_Design.md",
+                "game_summary.md",
+                "agent_log.json",
+                "tests/test_simulation.py",
+                "gridline/app.py",
+                "gridline/simulation.py",
+                "game_config.json"
+            ],
+            "intent": [
+                "Verify `OBJ-015` plus `BUG-015`, `BUG-016`, and `BUG-017` after the playtester-followup coder pass.",
+                "Resume `OBJ-014` only if the new usability/readability/pathing pass holds, and gather fresh evidence on secondary-mode and power-tower viability."
+            ],
+            "updates_made": [
+                {
+                    "file": "QA_TRACKER.md",
+                    "change_type": "updated",
+                    "summary": "Marked `OBJ-015` and `BUG-015` through `BUG-017` as pass, moved `OBJ-014` back into active evaluation, and refreshed `BUG-014` with new evidence showing reachable secondary modes but still-unreachable practical power usage."
+                },
+                {
+                    "file": "CURRENT_HANDOFFS.md",
+                    "change_type": "updated",
+                    "summary": "Cleared the processed Tester inbox, updated the User/Project Owner summary, and handed Planner the renewed Section 20 evidence after the follow-up pass verified cleanly."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Logged the verified follow-up usability/readability/pathing pass and the reopened `OBJ-014` findings so future agents can separate the closed UX/pathing items from the still-open power-tower viability problem."
+                }
+            ],
+            "next_step_suggestions": [
+                "Planner: review the renewed `OBJ-014` evidence and decide whether the next Section 20 batch should prioritize practical power-tower reachability, broader run-length pressure/economy tuning, or both.",
+                "Coder: hold until Planner chooses the next tuning target; `BUG-015`, `BUG-016`, and `BUG-017` are tester-approved.",
+                "Tester: wait for the next tuning pass or follow-up design clarification before attempting final `OBJ-014` closure."
+            ]
+        },
+        {
+            "entry_id": "planner-20260327-005",
+            "agent": "Planner",
+            "timestamp": "2026-03-27T18:30:48.2906366-06:00",
+            "status": "completed",
+            "looked_at": [
+                "CURRENT_HANDOFFS.md",
+                "Play_Tester_Notes.md",
+                "game_summary.md",
+                "QA_TRACKER.md",
+                "agent_log.json"
+            ],
+            "intent": [
+                "Review the renewed `OBJ-014` evidence and decide the next Section 20 tuning response.",
+                "Triage the new raw playtester ideas without letting scope-expanding concepts derail the current power-tower viability problem."
+            ],
+            "updates_made": [
+                {
+                    "file": "game_summary.md",
+                    "change_type": "updated",
+                    "summary": "Shifted the active post-MVP batch toward practical power-tower reachability and broader early-to-mid run extension, while explicitly deferring new green-seeding and default-medium-grid concepts from the raw playtester notes."
+                },
+                {
+                    "file": "CURRENT_HANDOFFS.md",
+                    "change_type": "updated",
+                    "summary": "Cleared the processed Planner inbox, updated the User/Project Owner summary, and handed Designer the task of reprioritizing `Game_Design.md` around power-tower reachability and the deferred raw-note concepts."
+                },
+                {
+                    "file": "Play_Tester_Notes.md",
+                    "change_type": "updated",
+                    "summary": "Marked the newly added raw playtester ideas as seen by Planner and recorded which concepts are deferred versus not approved for the current tuning phase."
+                }
+            ],
+            "next_step_suggestions": [
+                "Designer: update `Game_Design.md` so the next coder pass focuses on practical power-tower reachability and broader early-to-mid run extension inside existing systems.",
+                "Coder: hold until the design reprioritization lands, then target power-tower viability before revisiting deferred scope-expanding ideas.",
+                "Tester: after the next coder pass, continue `OBJ-014` with emphasis on whether a real power-tower charge/deploy decision becomes reachable in competent runs."
+            ]
+        },
+        {
+            "entry_id": "designer-20260327-004",
+            "agent": "Designer",
+            "timestamp": "2026-03-27T18:37:15.7289013-06:00",
+            "status": "completed",
+            "looked_at": [
+                "CURRENT_HANDOFFS.md",
+                "REPO_DOC_GUIDELINES.md",
+                "game_summary.md",
+                "QA_TRACKER.md",
+                "Play_Tester_Notes.md",
+                "Game_Design.md",
+                "agent_log.json"
+            ],
+            "intent": [
+                "Reprioritize `Game_Design.md` so the next Section 20 batch targets practical power-tower reachability and broader early-to-mid run extension inside existing systems.",
+                "Explicitly defer the newly triaged raw-note scope expansions so the next coder pass does not drift into unapproved concepts."
+            ],
+            "updates_made": [
+                {
+                    "file": "Game_Design.md",
+                    "change_type": "updated",
+                    "summary": "Rewrote Section 20 around `BUG-014`, using the new `128.03` to `160.03` second and `10%` to `30%` power-funding evidence, defining practical power reachability as the next success gate, and explicitly deferring the new green-seeding, default-medium-grid, and non-blocking seed-launch-path ideas."
+                },
+                {
+                    "file": "CURRENT_HANDOFFS.md",
+                    "change_type": "updated",
+                    "summary": "Cleared the processed Designer inbox item, updated the User/Project Owner summary, and replaced the stale Coder hold message with a concrete power-reachability tuning handoff."
+                },
+                {
+                    "file": "agent_log.json",
+                    "change_type": "updated",
+                    "summary": "Logged the Section 20 reprioritization so future agents treat practical power-tower reachability plus broader early-to-mid run extension as the active design authority for the next tuning pass."
+                }
+            ],
+            "next_step_suggestions": [
+                "Coder: use the revised Section 20 guidance in `Game_Design.md` to target practical power charging/deployment and longer competent runs using only existing pacing, economy, and power-funding levers.",
+                "Tester: after the next coder pass, continue `OBJ-014` with emphasis on whether a real power-tower charge or deploy decision becomes reachable before loss in competent runs.",
+                "Planner: revisit the deferred green-seeding or default-medium-grid ideas only if the approved existing-system levers still cannot make power practically reachable."
+            ]
+        }
+    ]
+}

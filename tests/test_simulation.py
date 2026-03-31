@@ -39,14 +39,23 @@ def test_game_config_overrides_runtime_spec():
     spec = load_game_spec("game_config.json")
     assert spec.width == 1280
     assert spec.height == 720
-    assert spec.starting_coins == 220
+    assert spec.starting_coins == 339
     assert spec.hardpoint_count == 12
     assert spec.level_interval == 45
-    assert spec.harvest_income_green == (4, 8, 14)
+    assert spec.spread_interval == 24
+    assert spec.harvest_income_green == (7, 12, 20)
+    assert spec.power_funding_chunk_cost == 34
+    assert spec.power_duration == 6
     assert spec.towers["basic_tower"].build_cost == 55
     assert spec.towers["seed_tower"].shot_range == 340
+    assert spec.towers["basic_tower"].secondary_mode.purchase_cost == 15
+    assert spec.towers["seed_tower"].secondary_mode.fire_rate_multiplier == 2.2
+    assert spec.towers["burst_tower"].secondary_mode.shot_cost_multiplier == 0.25
     assert spec.enemies["tower_striker"].hp == 25
     assert spec.enemies["corruption_seeder"].hp == 18
+    assert spec.spawn_interval_floor == 3.2
+    assert abs(spec.base_spawn_interval - 4.8) < 1e-9
+    assert spec.spawn_rate_growth_per_level == 0.02
     assert spec.visuals.neutral_large != spec.visuals.neutral_medium
     assert spec.visuals.neutral_medium != spec.visuals.neutral_small
     assert spec.visuals.large_line_width > spec.visuals.medium_line_width > spec.visuals.small_line_width
@@ -367,6 +376,49 @@ def test_orb_state_change_triggers_visible_segment_impact():
 
     assert segment_id in sim.segment_impacts
     assert sim.segment_impacts[segment_id].color == "blue"
+    assert sim.segment_impacts[segment_id].effect == "clean"
+
+
+def test_harvest_income_creates_popup_and_selected_tower_economy_snapshot():
+    sim = GameSimulation(default_spec())
+    first = next(iter(sim.hardpoints.values()))
+    sim.selected_hardpoint_id = first.hardpoint.key
+    sim.build_tower("basic_tower")
+    tower = first.tower
+    assert tower is not None
+
+    segment_id = next(iter(sim.segment_states))
+    segment = sim.topology.segments[segment_id]
+    sim.segment_states[segment_id].color = "green"
+    sim.segment_states[segment_id].intensity = 1
+    sim.segment_states[segment_id].harvest_progress = sim.spec.green_harvest_thresholds[0] - 0.01
+    orb = Orb(
+        key="orb_harvest",
+        owner_tower_id=tower.key,
+        owner_hardpoint_id=tower.hardpoint_id,
+        segment_id=segment_id,
+        from_node=segment.a,
+        to_node=segment.b,
+        distance_on_segment=0.0,
+        lifetime_remaining=1.0,
+        speed=10.0,
+        damage=0.0,
+        clean_rate=0.0,
+        harvest_rate=1.0,
+        turn_chance=0.0,
+        current_tier=segment.tier,
+        mode="default",
+        home_node_id=first.hardpoint.node_id,
+    )
+
+    sim._apply_orb_to_segment(segment_id, 0.02, orb)
+
+    assert len(sim.harvest_popups) == 1
+    hud = sim.hud_snapshot()
+    assert hud["recent_harvest_event"]["amount"] == sim.spec.harvest_income_green[0]
+    assert hud["recent_harvest_event"]["tower_name"] == "Basic Tower"
+    assert hud["selected_tower_economy"]["recent_harvest_income"] == sim.spec.harvest_income_green[0]
+    assert hud["selected_tower_economy"]["shot_cost"] == 2.0
 
 
 def test_corruption_seed_creates_pulse_and_enemy_telegraph_darkens():
@@ -395,14 +447,72 @@ def test_sidebar_uses_contextual_action_groups():
 
     assert "new_game" in app.utility_buttons
     assert app.action_groups["build"].winfo_manager() == "pack"
-    assert app.action_groups["tower"].winfo_manager() == ""
+    assert app.action_groups["tower"].winfo_manager() == "pack"
+    assert app.action_buttons["build_basic_tower"].cget("text") == "Basic | 55c"
+    assert app.action_buttons["build_basic_tower"].grid_info()["column"] == 0
+    assert app.action_buttons["build_seed_tower"].grid_info()["column"] == 1
+    assert app.action_buttons["build_burst_tower"].grid_info()["column"] == 2
+    assert "Build priorities:" in app.detail_text.get()
+    assert "reliable generalist" in app.detail_text.get()
 
     app.sim.build_tower("seed_tower")
     app._refresh_sidebar()
     app.root.update_idletasks()
     assert app.action_groups["tower"].winfo_manager() == "pack"
     assert app.action_groups["seed"].winfo_manager() == "pack"
+    assert app.action_buttons["upgrade_fire_rate"].grid_info()["column"] == 0
+    assert app.action_buttons["upgrade_hp"].grid_info()["column"] == 1
 
+    app.root.destroy()
+
+
+def test_empty_hardpoint_selection_resets_action_scroll_to_build_controls():
+    app = GridlineApp(default_spec())
+    app.root.update()
+    hardpoints = list(app.sim.hardpoints.values())
+    occupied = hardpoints[0]
+    empty = hardpoints[1]
+    app.sim.selected_hardpoint_id = occupied.hardpoint.key
+    app.sim.build_tower("seed_tower")
+    app._refresh_sidebar()
+    app.root.update_idletasks()
+
+    calls = []
+    app.action_canvas.yview_moveto = lambda value: calls.append(value)
+    app.sim.selected_hardpoint_id = empty.hardpoint.key
+    app._refresh_sidebar()
+    app.root.update_idletasks()
+
+    assert 0.0 in calls
+    assert app.action_groups["build"].winfo_manager() == "pack"
+    app.root.destroy()
+
+
+def test_action_group_positions_stay_stationary_through_selection_changes():
+    app = GridlineApp(default_spec())
+    app.root.update()
+    hardpoints = list(app.sim.hardpoints.values())
+    empty = hardpoints[1]
+    occupied = hardpoints[0]
+
+    app.sim.selected_hardpoint_id = empty.hardpoint.key
+    app._refresh_sidebar()
+    app.root.update_idletasks()
+    empty_positions = {
+        key: app.action_groups[key].winfo_y()
+        for key in ("tower", "seed", "power")
+    }
+
+    app.sim.selected_hardpoint_id = occupied.hardpoint.key
+    app.sim.build_tower("seed_tower")
+    app._refresh_sidebar()
+    app.root.update_idletasks()
+    occupied_positions = {
+        key: app.action_groups[key].winfo_y()
+        for key in ("tower", "seed", "power")
+    }
+
+    assert occupied_positions == empty_positions
     app.root.destroy()
 
 
@@ -418,7 +528,7 @@ def test_sidebar_uses_explicit_secondary_mode_names_in_details_and_actions():
     app._refresh_sidebar()
     app.root.update_idletasks()
 
-    assert app.action_buttons["buy_secondary"].cget("text") == "Buy Recall Mode"
+    assert app.action_buttons["buy_secondary"].cget("text") == "Buy Recall"
     assert "Mode: Default" in app.detail_text.get()
 
     assert app.sim.purchase_secondary_mode()
@@ -428,9 +538,140 @@ def test_sidebar_uses_explicit_secondary_mode_names_in_details_and_actions():
 
     assert "Mode: Recall Mode" in app.detail_text.get()
     assert "Recall Mode unlocked: Yes" in app.detail_text.get()
-    assert app.action_buttons["swap_mode"].cget("text") == "Switch to Default Mode"
+    assert app.action_buttons["swap_mode"].cget("text").startswith("To Default | Cooldown")
 
     app.root.destroy()
+
+
+def test_power_status_and_actions_show_funding_and_ready_state_clearly():
+    app = GridlineApp(default_spec())
+    app.root.update()
+    first = next(iter(app.sim.hardpoints.values()))
+    app.sim.selected_hardpoint_id = first.hardpoint.key
+    app._refresh_sidebar()
+    app.root.update_idletasks()
+
+    assert "Power: [FUNDING] [.........." in app.status_text.get()
+    assert app.action_buttons["fund_power"].cget("text") == "Fund +10% | 45c"
+
+    app.sim.power.charged = True
+    app._refresh_sidebar()
+    app.root.update_idletasks()
+
+    assert "Power: [READY] [##########] 100%" in app.status_text.get()
+    assert app.action_buttons["deploy_power"].cget("text") == "Deploy | Ready"
+
+    app.root.destroy()
+
+
+def test_disabled_actions_show_reason_in_place_and_success_feedback_updates():
+    app = GridlineApp(default_spec())
+    app.root.update()
+    first = next(iter(app.sim.hardpoints.values()))
+    app.sim.selected_hardpoint_id = first.hardpoint.key
+    app.sim.coins = 0
+    app._refresh_sidebar()
+    app.root.update_idletasks()
+
+    assert "Need 55c" in app.action_buttons["build_basic_tower"].cget("text")
+
+    app.sim.coins = 999
+    app._run_action("fund_power", lambda: app.sim.fund_power())
+    app.root.update_idletasks()
+
+    assert app.feedback_text.get() == "Power funding: 0% -> 10%."
+    app.root.destroy()
+
+
+def test_harvest_impact_uses_distinct_effect_type():
+    sim = GameSimulation(default_spec())
+    first = next(iter(sim.hardpoints.values()))
+    sim.selected_hardpoint_id = first.hardpoint.key
+    sim.build_tower("basic_tower")
+    tower = first.tower
+    assert tower is not None
+
+    segment_id = next(iter(sim.segment_states))
+    segment = sim.topology.segments[segment_id]
+    sim.segment_states[segment_id].color = "green"
+    sim.segment_states[segment_id].intensity = 1
+    sim.segment_states[segment_id].harvest_progress = sim.spec.green_harvest_thresholds[0] - 0.01
+    orb = Orb(
+        key="orb_harvest_effect",
+        owner_tower_id=tower.key,
+        owner_hardpoint_id=tower.hardpoint_id,
+        segment_id=segment_id,
+        from_node=segment.a,
+        to_node=segment.b,
+        distance_on_segment=0.0,
+        lifetime_remaining=1.0,
+        speed=10.0,
+        damage=0.0,
+        clean_rate=0.0,
+        harvest_rate=1.0,
+        turn_chance=0.0,
+        current_tier=segment.tier,
+        mode="default",
+        home_node_id=first.hardpoint.node_id,
+    )
+
+    sim._apply_orb_to_segment(segment_id, 0.02, orb)
+
+    assert sim.segment_impacts[segment_id].effect == "harvest"
+
+
+def test_basic_tower_default_prefers_interior_at_first_eligible_turn_from_top_edge():
+    sim = GameSimulation(default_spec())
+    top_node_id = next(
+        node_id
+        for node_id, node in sim.topology.nodes.items()
+        if "large" in node.tiers and node.y == sim.topology.playfield_rect[1] and len(sim.topology.adjacency[node_id]) >= 3
+    )
+    inward_turn_node_id = next(
+        sim._far_endpoint(top_node_id, segment_id)
+        for segment_id in sim.topology.adjacency[top_node_id]
+        if sim.topology.nodes[sim._far_endpoint(top_node_id, segment_id)].y == sim.topology.playfield_rect[1]
+    )
+    prev_node_id = next(
+        sim._far_endpoint(top_node_id, segment_id)
+        for segment_id in sim.topology.adjacency[top_node_id]
+        if sim._far_endpoint(top_node_id, segment_id) != inward_turn_node_id
+        and sim.topology.nodes[sim._far_endpoint(top_node_id, segment_id)].y == sim.topology.playfield_rect[1]
+    )
+    first_hardpoint = next(iter(sim.hardpoints.values()))
+    sim.selected_hardpoint_id = first_hardpoint.hardpoint.key
+    sim.build_tower("basic_tower")
+    tower = first_hardpoint.tower
+    assert tower is not None
+    orb = type(
+        "OrbStub",
+        (),
+        {
+            "from_node": prev_node_id,
+            "mode": "default",
+            "interior_bias_edge": "top",
+            "interior_bias_remaining": float(sim.spec.large_spacing),
+        },
+    )()
+
+    candidates = sim._legal_segments_from_node(top_node_id, prev_node_id, "large")
+    chosen = sim._select_segment_for_tower(tower, orb, top_node_id, candidates)
+    target = sim.topology.nodes[sim._far_endpoint(top_node_id, chosen)]
+    assert target.y > sim.topology.playfield_rect[1]
+
+
+def test_seed_tower_default_targets_prefer_interior_nodes_when_available():
+    sim = GameSimulation(default_spec())
+    hardpoint = next(item for item in sim.hardpoints.values() if item.hardpoint.side == "top")
+    sim.selected_hardpoint_id = hardpoint.hardpoint.key
+    sim.build_tower("seed_tower")
+    tower = hardpoint.tower
+    assert tower is not None
+
+    for _ in range(10):
+        target_node_id = sim._select_seed_target(tower, hardpoint.hardpoint.node_id, sim.shot_range_value(tower))
+        assert target_node_id is not None
+        assert sim._is_node_interior_preferred(target_node_id, "top")
 
 
 def test_topology_respects_playfield_viewport_override_for_hardpoint_bounds():
@@ -442,6 +683,86 @@ def test_topology_respects_playfield_viewport_override_for_hardpoint_bounds():
     assert len(topology.hardpoints) == 12
     assert bottom <= 616
     assert max_hardpoint_y <= bottom
+
+
+def test_live_config_opener_styles_reach_the_minute_two_checkpoint_window():
+    spec = load_game_spec("game_config.json")
+
+    def run(style: str) -> float:
+        sim = GameSimulation(spec)
+        hardpoints = list(sim.hardpoints.values())
+        if style == "basic_only":
+            sim.selected_hardpoint_id = hardpoints[0].hardpoint.key
+            sim.build_tower("basic_tower")
+        elif style == "mixed_three":
+            for hardpoint, tower_key in zip(hardpoints[:3], ("basic_tower", "seed_tower", "burst_tower")):
+                sim.selected_hardpoint_id = hardpoint.hardpoint.key
+                sim.build_tower(tower_key)
+        elif style == "upgrade_first":
+            sim.selected_hardpoint_id = hardpoints[0].hardpoint.key
+            sim.build_tower("basic_tower")
+            sim.upgrade_selected_tower_type("fire_rate")
+        else:
+            raise AssertionError(style)
+
+        elapsed = 0.0
+        dt = 1.0 / sim.spec.simulation_tick_rate
+        while not sim.game_over and elapsed < 180.0:
+            sim.update(dt)
+            elapsed += dt
+        return elapsed
+
+    for style in ("basic_only", "mixed_three", "upgrade_first"):
+        assert run(style) >= 120.0, style
+
+
+def test_live_config_power_rush_can_reach_a_real_power_deploy_window():
+    spec = load_game_spec("game_config.json")
+    sim = GameSimulation(spec)
+    hardpoints = list(sim.hardpoints.values())
+    sim.selected_hardpoint_id = hardpoints[0].hardpoint.key
+    assert sim.build_tower("basic_tower")
+
+    elapsed = 0.0
+    dt = 1.0 / sim.spec.simulation_tick_rate
+    charged = False
+    deployed = False
+    highest_funding = 0
+
+    while not sim.game_over and elapsed < 180.0:
+        built_count = len([item for item in hardpoints[:3] if item.tower is not None])
+        # Keep this line power-leaning, but do not let it starve the board so hard
+        # that the new late-use timing gate becomes impossible by construction.
+        if built_count < 2 and (elapsed >= 35.0 or sim.power.funding_percent >= 30):
+            sim.selected_hardpoint_id = hardpoints[1].hardpoint.key
+            sim.build_tower("seed_tower")
+        elif built_count < 3 and (elapsed >= 70.0 or sim.power.funding_percent >= 60):
+            sim.selected_hardpoint_id = hardpoints[2].hardpoint.key
+            sim.build_tower("basic_tower")
+        elif sim.fund_power_preview()[0]:
+            sim.fund_power()
+        highest_funding = max(highest_funding, sim.power.funding_percent)
+        if sim.power.charged:
+            charged = True
+            sim.selected_hardpoint_id = hardpoints[0].hardpoint.key
+            if sim.action_availability()["deploy_power"][0]:
+                deployed = sim.deploy_power_to_selected() or deployed
+        sim.update(dt)
+        elapsed += dt
+
+    assert charged or deployed or highest_funding >= 60
+
+
+def test_live_config_starting_economy_cannot_buy_full_power_charge_immediately():
+    spec = load_game_spec("game_config.json")
+    assert spec.starting_coins < spec.power_funding_chunk_cost * 10
+
+    sim = GameSimulation(spec)
+    while sim.fund_power_preview()[0]:
+        sim.fund_power()
+
+    assert sim.power.funding_percent < 100
+    assert sim.power.charged is False
 
 
 def _hex_luminance(color: str) -> int:

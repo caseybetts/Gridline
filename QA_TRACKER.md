@@ -7,7 +7,7 @@ This file tracks:
 2. Specific bugs and implementation gaps that require coder action.
 3. Clear pass criteria so features can move from exploratory testing to approval.
 
-Use this file as the QA-facing working list. Use `agent_log.json` for formal cross-agent handoff entries and historical record.
+Use this file as the QA-facing working list. Use `agent_log.txt` for formal cross-agent handoff entries and historical record.
 
 ## Status Legend
 - `todo`: Not yet tested or not yet fixed.
@@ -26,7 +26,7 @@ Use this file as the QA-facing working list. Use `agent_log.json` for formal cro
 ## Current Test Objectives
 | ID | Objective | Scope | Current Status | Pass Criteria | Primary References |
 | --- | --- | --- | --- | --- | --- |
-| OBJ-001 | Launch and smoke-test playable MVP | App boot, run loop, quit, fullscreen, HUD visibility | `todo` | `python main.py` launches, remains stable, supports `Esc` quit and fullscreen toggle, no immediate runtime errors | `main.py`, `gridline/app.py`, `agent_log.json` |
+| OBJ-001 | Launch and smoke-test playable MVP | App boot, run loop, quit, fullscreen, HUD visibility | `pass` | `python main.py` launches, remains stable, supports `Esc` quit and fullscreen toggle, no immediate runtime errors | `main.py`, `gridline/app.py`, `agent_log.txt` |
 | OBJ-002 | Validate topology and hardpoint layout | Grid generation, 12-hardpoint perimeter layout, selection readability | `pass` | Exactly 12 hardpoints appear with 3 per side and remain stable through a run | `gridline/topology.py`, `tests/test_simulation.py`, `Game_Design.md` sections `1`, `10` |
 | OBJ-003 | Validate direct hardpoint build flow | Empty-hardpoint build gating, selected-state UI, no activation step | `pass` | Empty hardpoints are directly buildable when affordable, invalid actions are visibly disabled or explained, and no player-facing activation language remains | `gridline/app.py`, `gridline/simulation.py`, `Game_Design.md` sections `2`, `8` |
 | OBJ-004 | Validate base tower behavior and upgrades | `Basic`, `Seed`, `Burst`, upgrade tracks, cooldown/readiness display | `pass` | Towers behave per archetype, all approved upgrade tracks are available, HUD reflects state accurately | `gridline/simulation.py`, `gridline/app.py`, `Game_Design.md` sections `2A`-`2E`, `13`, `14` |
@@ -35,9 +35,14 @@ Use this file as the QA-facing working list. Use `agent_log.json` for formal cro
 | OBJ-007 | Validate line-state spread and conflict resolution | Red/green spread timing, intensity, same-step conflict arbitration | `pass` | Same-step red/green conflicts preserve existing color regardless of call order | `gridline/simulation.py`, `Game_Design.md` section `4` |
 | OBJ-008 | Validate Burst/Focus path rules and orb readability | Focus tie-break logic, path-faithful orb trail rendering, combat readability | `pass` | Equal-angle Focus ties randomize correctly and orb trails stay on-grid through turns/intersections while fading from head to oldest tail segment | `gridline/simulation.py`, `gridline/app.py`, `Game_Design.md` sections `2E`, `9` |
 | OBJ-009 | Validate config-driven runtime values | `game_config.json` mapping into live runtime | `pass` | Visible config changes affect runtime consistently after relaunch | `gridline/spec.py`, `game_config.json`, `game_config_schema.json` |
-| OBJ-010 | Validate regression test coverage for known risk areas | Automated coverage for critical gameplay behaviors | `pass` | Tests cover fixed Seed flight, power funding lockout, spread conflict resolution, Focus tie-breaks, and UI eligibility logic where practical | `tests/test_simulation.py`, `agent_log.json` |
+| OBJ-010 | Validate regression test coverage for known risk areas | Automated coverage for critical gameplay behaviors | `pass` | Tests cover fixed Seed flight, power funding lockout, spread conflict resolution, Focus tie-breaks, and UI eligibility logic where practical | `tests/test_simulation.py`, `agent_log.txt` |
 | OBJ-011 | Validate gameplay readability cues | Enemy seeding telegraph, line-intensity readability, visible orb-impact feedback | `pass` | Corruption seeders darken before release and pulse on seeding, green/red line levels read light-to-dark by intensity, and meaningful orb state changes create an immediately visible line-feedback step | `gridline/simulation.py`, `gridline/app.py`, `Game_Design.md` readability sections |
 | OBJ-012 | Validate structured sidebar layout | Persistent status, contextual actions, utility separation, overflow reachability | `pass` | Status remains pinned, selection details stay visible, low-frequency controls live in a separate utility region, contextual actions swap by selection state, and the action region remains reachable without one long clipped button column | `gridline/app.py`, `Game_Design.md` sidebar layout sections |
+| OBJ-013 | Evaluate post-MVP run pacing and economy pressure | Section 20 live-play evidence for survival target, opener pressure, and early spending flexibility | `in_progress` | In informed non-throw play, most losses land inside the 10 to 15 minute target band; repeated losses before minute 5 are exceptional; early experiments do not instantly collapse the run | `game_summary.md` current milestone, `Game_Design.md` section `20`, `agent_log.txt` |
+| OBJ-014 | Evaluate post-MVP role separation and late-use systems | Tower-role clarity, secondary-mode usefulness, power-tower usage, and remaining readability/usability friction in longer sessions | `in_progress` | Sessions last long enough to judge archetype separation, secondary-mode tradeoffs, power-tower usage, and late-run readability without opener collapse dominating the result | `game_summary.md` current milestone, `Game_Design.md` section `20`, `agent_log.txt` |
+| OBJ-015 | Validate playtester-followup usability, feedback, and interior-influence pass | Empty-hardpoint build reachability, attributed harvest/economy feedback, and default `Basic Tower` / `Seed Tower` interior influence | `pass` | Selecting an empty hardpoint resets the contextual action region to the build controls, real orb/harvest results create immediate local feedback plus attributable recent-income telemetry, and default `Basic Tower` / `Seed Tower` output visibly favors interior lines from edge hardpoints without breaking the minute-2 checkpoint regression | `gridline/app.py`, `gridline/simulation.py`, `tests/test_simulation.py`, `Game_Design.md` sections `3B`, `4`, `5`, `8` |
+| OBJ-016 | Validate config-agnostic HUD and sidebar readability pass | Relative status bars/badges, in-place disabled-action reasons, compact action labels, and success feedback under variable config values | `pass` | At the minimum supported window, run-critical status keeps a stable scan order, power/corruption state remains legible through text-plus-bar treatment, unavailable actions show concise in-place reasons, and successful funding/mode/build actions emit immediate readable feedback without relying on fixed balance assumptions | `gridline/app.py`, `tests/test_simulation.py`, `Game_Design.md` section `8A` |
+| OBJ-017 | Validate stable grouped controls and directional corruption-reduction cues | Stationary grouped action shells, concise multi-column labels, and cleaner orb-to-corruption cause-and-effect readability | `pass` | At the minimum supported window, grouped action shells stay visually stationary through normal selection changes, compact labels keep primary action meaning readable under wide value ranges, and orb-driven red/green reductions read as calming/cleaning events rather than generic flashes | `gridline/app.py`, `gridline/simulation.py`, `tests/test_simulation.py`, `Game_Design.md` sections `4`, `8`, `8A` |
 
 ## Active Bug Queue
 | Bug ID | Priority | Feature | Status | Owner | Summary |
@@ -54,13 +59,20 @@ Use this file as the QA-facing working list. Use `agent_log.json` for formal cro
 | BUG-010 | `P1` | Corruption seeder telegraph direction | `pass` | Coder | Corruption seeders currently render darkest when farthest from seeding and become lighter as they approach release, opposite the approved readability rule. |
 | BUG-011 | `P1` | Power tower suspended-state restoration | `pass` | Coder | Suspended towers now freeze their cooldown-backed readiness state during power override so restoration can return the pre-power timings intact. |
 | BUG-012 | `P2` | Secondary mode UI naming | `pass` | Coder | Sidebar mode text and action labels now use explicit fixed mode names instead of generic `secondary` wording. |
+| BUG-013 | `P0` | Post-MVP opener pressure and pacing | `pass` | Coder | The opener-stabilization pass no longer collapses informed openers in seconds and restores the minute-2 checkpoint as a reachable evaluation gate. |
+| BUG-014 | `P1` | Secondary-mode and power-tower practical viability | `pass` | Coder | Live-config tuning now reaches real charge/deploy windows in sampled `secondary-first`, `mixed-then-power`, and `direct power-rush` runs while the minute-two checkpoint regression still passes. |
+| BUG-015 | `P1` | Empty-hardpoint build-control reachability | `pass` | Coder | Selecting an empty hardpoint now resets the contextual action region back to the build controls so tower choices do not stay hidden below the prior scroll offset. |
+| BUG-016 | `P1` | Orb-impact, harvest-result, and economy attribution feedback | `pass` | Coder | Real green/red line-state steps now pair the existing line flash with local `+coins` harvest popups, a recent-harvest HUD line, and selected-tower economy telemetry so testers can tell what income was earned and by which tower behavior. |
+| BUG-017 | `P1` | Default edge-tower interior influence | `pass` | Coder | Default `Basic Tower` and `Seed Tower` output now applies interior-favoring turn/target rules from edge hardpoints so they stop settling into persistent perimeter-only coverage. |
+| BUG-018 | `P1` | Grouped action-shell stability | `pass` | Coder | The selection panel now uses a stable height budget and fixed button line count so the grouped action shells stay visually stationary through normal selection changes at the minimum supported window. |
+| BUG-019 | `P1` | Section 20 role separation and late-use value | `verify_fix` | Coder | The live config now gives later power funding more runway, raises the power-leaning floor to `60%`, and materially strengthens the three secondary modes while still blocking immediate full-charge opener rush. |
 
 ## Bug Details
 
 ### BUG-001: Seed Tower skips seed-in-flight phase
 - Feature Tested: `Seed Tower` targeting, launch, flight, landing release
 - Status: `PASS`
-- Source: `designer-20260324-012` in `agent_log.json`
+- Source: `designer-20260324-012` in `agent_log.txt`
 - Priority: `P0`
 - Coder Target:
   - `gridline/simulation.py:361`
@@ -84,7 +96,7 @@ Use this file as the QA-facing working list. Use `agent_log.json` for formal cro
 ### BUG-002: Power funding is not locked during active deployment
 - Feature Tested: Power tower funding and active-window restrictions
 - Status: `PASS`
-- Source: `designer-20260324-012` in `agent_log.json`
+- Source: `designer-20260324-012` in `agent_log.txt`
 - Priority: `P0`
 - Coder Target:
   - `gridline/simulation.py:258`
@@ -104,7 +116,7 @@ Use this file as the QA-facing working list. Use `agent_log.json` for formal cro
 ### BUG-003: Selected panel shows wrong object during power override
 - Feature Tested: Power tower HUD/selection reporting
 - Status: `PASS`
-- Source: `designer-20260324-012` in `agent_log.json`
+- Source: `designer-20260324-012` in `agent_log.txt`
 - Priority: `P1`
 - Coder Target:
   - `gridline/simulation.py:281`
@@ -128,7 +140,7 @@ Use this file as the QA-facing working list. Use `agent_log.json` for formal cro
 ### BUG-004: Red/green spread conflicts are resolved by update order
 - Feature Tested: Shared spread resolution and same-step conflict handling
 - Status: `PASS`
-- Source: `designer-20260324-012` in `agent_log.json`
+- Source: `designer-20260324-012` in `agent_log.txt`
 - Priority: `P0`
 - Coder Target:
   - `gridline/simulation.py:796`
@@ -148,7 +160,7 @@ Use this file as the QA-facing working list. Use `agent_log.json` for formal cro
 ### BUG-005: Sidebar leaves invalid actions clickable
 - Feature Tested: Build/upgrade/purchase affordance and player feedback
 - Status: `PASS`
-- Source: `designer-20260324-012` in `agent_log.json`
+- Source: `designer-20260324-012` in `agent_log.txt`
 - Priority: `P1`
 - Coder Target:
   - `gridline/app.py:41`
@@ -169,7 +181,7 @@ Use this file as the QA-facing working list. Use `agent_log.json` for formal cro
 ### BUG-006: Sidebar is missing approved upgrade tracks and preview text
 - Feature Tested: Upgrade panel completeness and readability
 - Status: `PASS`
-- Source: `designer-20260324-012` in `agent_log.json`
+- Source: `designer-20260324-012` in `agent_log.txt`
 - Priority: `P1`
 - Coder Target:
   - `gridline/app.py:123`
@@ -188,7 +200,7 @@ Use this file as the QA-facing working list. Use `agent_log.json` for formal cro
 ### BUG-007: Orbs lack trail rendering
 - Feature Tested: Orb readability and rendering fidelity
 - Status: `PASS`
-- Source: `designer-20260324-012` in `agent_log.json`
+- Source: `designer-20260324-012` in `agent_log.txt`
 - Priority: `P2`
 - Coder Target:
   - `gridline/app.py:169`
@@ -207,7 +219,7 @@ Use this file as the QA-facing working list. Use `agent_log.json` for formal cro
 ### BUG-008: Focus Mode tie-breaks are not randomized correctly
 - Feature Tested: `Burst Tower / Focus Mode` path selection
 - Status: `PASS`
-- Source: `designer-20260324-012` in `agent_log.json`
+- Source: `designer-20260324-012` in `agent_log.txt`
 - Priority: `P1`
 - Coder Target:
   - `gridline/simulation.py:594`
@@ -227,7 +239,7 @@ Use this file as the QA-facing working list. Use `agent_log.json` for formal cro
 ### BUG-009: Regression coverage is too thin for current risk areas
 - Feature Tested: Automated test coverage for high-risk behavior
 - Status: `PASS`
-- Source: `designer-20260324-012` in `agent_log.json`
+- Source: `designer-20260324-012` in `agent_log.txt`
 - Priority: `P1`
 - Coder Target:
   - `tests/test_simulation.py`
@@ -248,7 +260,7 @@ Use this file as the QA-facing working list. Use `agent_log.json` for formal cro
 ### BUG-010: Corruption seeder telegraphing darkens in the wrong direction
 - Feature Tested: Corruption seeder pre-seed telegraph readability
 - Status: `PASS`
-- Source: `planner-20260325-004`, `designer-20260325-004`, and `coder-20260325-005` in `agent_log.json`
+- Source: `planner-20260325-004`, `designer-20260325-004`, and `coder-20260325-005` in `agent_log.txt`
 - Priority: `P1`
 - Coder Target:
   - `gridline/app.py:134`
@@ -306,14 +318,171 @@ Use this file as the QA-facing working list. Use `agent_log.json` for formal cro
   - Automated regression now checks `Recall Mode` naming in both the selected-object text and the sidebar action labels.
   - This closes the remaining HUD signoff blocker for `OBJ-004`.
 
+### BUG-013: Post-MVP opener pressure collapses far below the Section 20 target band
+- Feature Tested: Section 20 run pacing and economy pressure
+- Status: `PASS`
+- Source: tester live-play evaluation against `game_summary.md` current milestone and `Game_Design.md` section `20`
+- Priority: `P0`
+- Coder Target:
+  - `gridline/simulation.py`
+  - `gridline/spec.py`
+  - `game_config.json`
+- Bug Description: The current post-MVP build failed the first tuning lane before later systems could be meaningfully evaluated. Across informed scripted play sessions, the run ended in seconds rather than minutes, massively below the required Section 20 pacing floor.
+- Reproduction Steps:
+  1. Start a fresh run on the current build.
+  2. Use any informed opener such as a mixed three-tower start, a basic-only start, or an upgrade-first start.
+  3. Continue making reasonable build/upgrade decisions without intentionally stalling.
+  4. Record `run_duration` and compare it to the Section 20 target band.
+- Expected vs. Actual Result:
+  - Expected: In informed non-throw play, most losses should land inside the `10` to `15` minute target band, and repeated losses before minute `5` should be exceptional.
+  - Actual: Re-test confirmed the opener-stabilization gate. Repeated checkpoint regression runs passed, and standalone informed opener retests now survive to `120.03` to `128.03` seconds instead of the prior `12.0` to `14.3` second collapse band.
+- QA Verification Notes:
+  - `python -m pytest tests/test_simulation.py -q -k minute_two` passed in five consecutive reruns after one initial inconsistent invocation.
+  - Standalone retests of the same `basic_only`, `mixed_three`, and `upgrade_first` opener styles finished at `120.03` or `128.03` seconds.
+  - This closes the emergency opener-collapse blocker, but the broader Section 20 pacing target remains under `OBJ-013`.
+
+### BUG-014: Secondary modes and the power tower are strategically non-viable under the current opener
+- Feature Tested: Section 20 secondary-mode tradeoffs and power-tower usage
+- Status: `PASS`
+- Source: tester live-play evaluation against `game_summary.md` current milestone and `Game_Design.md` section `20`
+- Priority: `P1`
+- Coder Target:
+  - `gridline/simulation.py`
+  - `gridline/spec.py`
+  - `game_config.json`
+- Bug Description: The reopened Section 20 lane now allows meaningful secondary-mode testing, but the power tower still does not become practically reachable or usable during reasonable early-to-mid runs, and the broader late-run judgment window remains short.
+- Reproduction Steps:
+  1. Start a fresh run.
+  2. Try an informed secondary-first opener such as `Basic Tower -> Guard Mode`, or a power-rush opener that buys early power funding chunks after the first tower.
+  3. Continue making reasonable follow-up choices.
+  4. Compare the resulting run duration and system usage against a more board-stabilizing opener.
+- Expected vs. Actual Result:
+  - Expected: Secondary modes should offer meaningful situational tradeoffs, and the power tower should function as an emergency stabilizer that becomes meaningfully usable during longer runs.
+- Actual: Re-test confirmed the practical-viability fix. Direct execution of the live-config regression functions passed for both the minute-two checkpoint and the deterministic power-window check, and sampled `secondary-first`, `mixed-then-power`, and `direct power-rush` runs each reached `100%` funding plus one real deploy before loss or the local time cap.
+- QA Verification Notes:
+  - Directly invoked `test_live_config_opener_styles_reach_the_minute_two_checkpoint_window()` and `test_live_config_power_rush_can_reach_a_real_power_deploy_window()` from `tests/test_simulation.py` because `pytest` is not installed in the default interpreter in this workspace.
+  - Sampled deterministic runs with seeds `1`, `7`, and `13` all reached a real power deploy in the three named styles; observed run durations ranged from `120.03` to `144.03` seconds for most losses, with one `mixed-then-power` sample reaching the local `240.03` second cap.
+  - `Guard Mode` activation remained reachable in the sampled `secondary-first` line, and the minute-two checkpoint remained intact after the economy and power-funding changes.
+  - This closes `BUG-014`, but the broader Section 20 pacing and longer-session evaluation gates remain open under `OBJ-013` and `OBJ-014`.
+
+### BUG-015: Empty hardpoint selection can leave build controls below the current scroll offset
+- Feature Tested: Sidebar contextual-action reachability
+- Status: `PASS`
+- Source: planner/designer triage of `Play_Tester_Notes.md`
+- Priority: `P1`
+- Coder Target:
+  - `gridline/app.py`
+  - `tests/test_simulation.py`
+- Bug Description: After the sidebar has been scrolled while a tower is selected, choosing an empty hardpoint can leave the build actions below the retained scroll offset. The build controls exist, but they are not immediately reachable.
+- Reproduction Steps:
+  1. Select a tower with enough contextual controls to scroll the action region.
+  2. Scroll the action region downward.
+  3. Select an empty hardpoint.
+  4. Check whether the build controls are immediately visible without additional scrolling.
+- Expected vs. Actual Result:
+  - Expected: Selecting an empty hardpoint resets the contextual action region to the build group so the build buttons are immediately visible.
+  - Actual: Re-test confirmed the fix in both the default view and a constrained live-config window. Empty-hardpoint selection resets the action region to the build group and forces the scroll position back to the top.
+- QA Verification Notes:
+  - Runtime probe confirmed the build action group repacks immediately after selecting an empty hardpoint.
+  - Constrained-window verification at `900x520` still triggered the reset path.
+
+### BUG-016: Harvest results and economy contribution are still too opaque during playtesting
+- Feature Tested: Orb-impact readability, harvest-result feedback, and tester-facing economy clarity
+- Status: `PASS`
+- Source: planner/designer triage of `Play_Tester_Notes.md`
+- Priority: `P1`
+- Coder Target:
+  - `gridline/simulation.py`
+  - `gridline/app.py`
+  - `tests/test_simulation.py`
+- Bug Description: Testers could not reliably tell when an orb had actually stepped down a line state, what harvest income had just been earned, or which tower behavior was producing the income.
+- Reproduction Steps:
+  1. Launch a run and build at least one tower that can harvest green lines.
+  2. Watch orb interactions against both red and green lines during live play.
+  3. When harvest income occurs, inspect the local playfield cue, recent-harvest HUD line, and selected-tower details.
+  4. Compare whether the tester can now attribute recent income and compare tower economy behavior without guesswork.
+- Expected vs. Actual Result:
+  - Expected: Real line-state drops remain visibly flashed, harvest income creates a local `+coins` cue near the affected segment, the HUD reports the latest harvest event, and the selected-tower panel exposes shot-cost plus harvest-relevant output and recent income.
+  - Actual: Re-test confirmed the new feedback chain on a real harvest event. The live-config runtime produced a local `+4c` popup, a matching recent-harvest HUD entry, and selected-tower economy telemetry showing `Recent +4c / 6s` for the firing `Basic Tower`.
+- QA Verification Notes:
+  - The event remained tied to a real green-line harvest threshold crossing rather than a no-op contact.
+  - No-selection and selected-tower text both exposed the recent-income attribution clearly enough to identify the responsible tower and mode.
+
+### BUG-017: Default Basic and Seed output still reads as perimeter-hugging instead of interior-reaching
+- Feature Tested: Default `Basic Tower` and default `Seed Tower` edge-origin influence
+- Status: `PASS`
+- Source: planner/designer triage of `Play_Tester_Notes.md`
+- Priority: `P1`
+- Coder Target:
+  - `gridline/simulation.py`
+  - `tests/test_simulation.py`
+- Bug Description: Playtest evidence showed `Basic Tower` often cleaning along the wall and `Seed Tower` repeatedly launching into one direction, undermining the intended edge-hardpoint-to-interior containment fantasy.
+- Reproduction Steps:
+  1. Start a run and build default `Basic Tower` and default `Seed Tower` on edge hardpoints.
+  2. Observe several shots from each while they remain in default mode.
+  3. Check whether default `Basic Tower` takes inward turns from edge-origin travel and whether default `Seed Tower` preferentially chooses interior-capable launch targets and landing exits when available.
+  4. Compare the result against the prior perimeter-skimming behavior.
+- Expected vs. Actual Result:
+  - Expected: Default `Basic Tower` and `Seed Tower` should visibly influence interior lines from edge hardpoints instead of collapsing into one perimeter lane whenever a legal inward route exists.
+  - Actual: Re-test confirmed the new interior bias in live-config probes. Default `Seed Tower` repeatedly selected interior-preferred targets from a top-edge hardpoint, and default `Basic Tower` chose the first eligible inward turn from top-edge travel instead of continuing to skim the perimeter.
+- QA Verification Notes:
+  - `python -m pytest tests/test_simulation.py -q -k minute_two` passed in three consecutive reruns after the pathing change.
+  - `Guard Mode` and `Recall Mode` remain intentionally local; the verified improvement is specific to the default modes.
+
+### BUG-018: Grouped action shells still shift vertically when selection details grow
+- Feature Tested: Stationary grouped action shells and multi-column control stability
+- Status: `PASS`
+- Source: tester verification against `Game_Design.md` sections `8` and `8A`
+- Priority: `P1`
+- Coder Target:
+  - `gridline/app.py`
+  - `tests/test_simulation.py`
+- Bug Description: The new grouped action shells stay mounted and the multi-column labels remain readable, but the entire action region still moves vertically when the selection/details block changes height. That violates the approved requirement that action groups keep consistent positions and footprints so the sidebar appears stationary through normal selection changes.
+- Reproduction Steps:
+  1. Launch the current build at the default minimum supported `1280x720` window.
+  2. Select an empty hardpoint and note the `Actions` section positions.
+  3. Select a hardpoint with a built tower such as a `Seed Tower`, then compare the action-group positions again.
+  4. Repeat with another occupied hardpoint type to confirm the shift is tied to detail-block growth rather than a one-off group layout issue.
+- Expected vs. Actual Result:
+  - Expected: The grouped action shells keep consistent vertical positions and footprints while only their active emphasis or internal contents change.
+- Actual: Re-test confirmed the fix. Direct runtime probes at `1280x720` kept the grouped action-shell positions unchanged across empty, `Seed Tower`, and `Basic Tower` selections, while the directional clean/harvest impact cues remained distinct.
+- QA Verification Notes:
+  - Targeted direct-test execution passed the focused regressions covering stationary action-group positions, grouped layout behavior, empty-hardpoint scroll reset, and distinct clean-vs-harvest impact typing.
+  - The runtime position probe held exactly at `build_y=0`, `tower_y=92`, `seed_y=355`, and `power_y=561` across empty, `Seed Tower`, and `Basic Tower` selection states at `1280x720`.
+  - A wide-value-range probe kept the shortened build label readable under affordability changes (`Basic | 55c | Need 55c` -> `Basic | 55c`) without introducing new shell movement.
+
+### BUG-019: Secondary-mode tradeoffs and power-tower timing still do not read as strong late-use decisions
+- Feature Tested: Section 20 role separation, secondary-mode usefulness, and power-tower timing/value
+- Status: `VERIFY_FIX`
+- Source: tester live-config evaluation against `game_summary.md` current milestone and `Game_Design.md` section `20`
+- Priority: `P1`
+- Coder Target:
+  - `gridline/simulation.py`
+  - `gridline/spec.py`
+  - `game_config.json`
+  - `tests/test_simulation.py`
+- Bug Description: The broader Section 20 lane is now readable enough to judge, but the late-use systems still do not produce a clean qualitative read in the current live config. In paired seeded probes, `Guard Mode` was only a narrow tradeoff, `Recall Mode` and `Focus Mode` shortened survival versus equivalent default-mode lines, and proactive power funding in an otherwise competent mixed line reduced survival instead of behaving like an attractive emergency stabilizer. The same live config also allows immediate full power funding from starting economy if the player greedily buys chunks, which muddies the intended late-use timing.
+- Reproduction Steps:
+  1. Run the current live-config baseline regressions by directly invoking `test_live_config_opener_styles_reach_the_minute_two_checkpoint_window()` and `test_live_config_power_rush_can_reach_a_real_power_deploy_window()` from `tests/test_simulation.py`.
+  2. Run paired seeded simulations with identical build orders except for one change: leave a tower in default mode versus buying and activating its fixed secondary mode (`Basic` vs `Guard`, `Seed` vs `Recall`, `Burst` vs `Focus`).
+  3. Repeat with a mixed three-tower line that either spends on normal expansion only or diverts ongoing income into power funding once the board is established.
+  4. Compare `run_duration`, practical power usage, and whether the altered line creates a clearer or stronger role-specific decision instead of simply shortening survival.
+- Expected vs. Actual Result:
+  - Expected: Secondary modes should solve real situational weaknesses without replacing default behavior in ordinary play, and power funding should create a meaningful clutch timing/value decision rather than either crowding out expansion or reading as ignorable.
+  - Actual: Coder pushed a second live-config retune that raises starting runway, harvest income, and late-use mode strength without restoring the opener full-charge exploit. Direct runtime checks now pass the minute-two opener floor, the no-immediate-full-charge guard, and the updated power-leaning funding regression with a higher `60%` floor (`4 passed`). A short two-seed coder spot-check no longer showed the across-the-board mode penalty from the prior batch (`Basic`/`Guard` `360s` vs `360s`, `Seed`/`Recall` `336s` vs `336s`, `Burst`/`Focus` `360s` vs `360s`), but tester must re-run the broader three-seed qualitative pass before this can be closed.
+- QA Verification Notes:
+  - Re-run the broader paired seeded probes for default vs `Guard Mode`, `Recall Mode`, and `Focus Mode` on seeds `1`, `7`, and `13`, plus the mixed-line and power-leaning follow-ups.
+  - Confirm the opener full-charge exploit remains blocked while the stronger live-config economy now makes later power funding feel practical enough to judge.
+  - `OBJ-014` remains open until secondary-mode value and power timing can be judged without the prior contradictory signals.
+
 ## Next QA Sequence
 1. Re-run smoke and interaction testing after the next coder pass.
 2. Move any coder-claimed fixes from `todo` to `verify_fix`.
 3. Re-test each bug against the explicit expected result in this file.
-4. When a bug passes, add a formal approval or bug-resolution entry to `agent_log.json`.
+4. When a bug passes, add a formal approval or bug-resolution entry to `agent_log.txt`.
 
 ## File Maintenance Rules
 - Add new bugs under `Active Bug Queue` first, then create a detailed entry if coder action is needed.
 - Keep bug IDs stable even if wording changes.
-- Update status here before writing the formal `agent_log.json` entry so the working queue stays current.
+- Update status here before writing the formal `agent_log.txt` entry so the working queue stays current.
 - Do not mark `pass` unless the behavior has been re-tested after the relevant code change.

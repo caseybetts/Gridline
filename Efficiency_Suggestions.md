@@ -14,3 +14,8 @@
     design doc” when the change is narrow.
   - Avoid asking me to restate work already completed unless you suspect a missed newer entry.
     That tends to spend context on verification instead of progress.
+
+
+  Better prompt:
+    Read CURRENT_HANDOFFS.md, execute the active task assigned to the next role end-to-end, then update CURRENT_HANDOFFS.md,
+  QA_TRACKER.md, and agent_log.txt as needed with the outcome.

@@ -13,13 +13,13 @@ Last updated: `2026-03-25`
 Read these in this order before changing code:
 
 1. `Coder_Prompt.md`
-2. `agent_log.json`
+2. `agent_log.txt`
 3. `game_summary.md`
 4. `Game_Design.md`
 5. `QA_TRACKER.md`
 
 Rules:
-- `agent_log.json` is the cross-agent handoff record and the first place to check for the newest approved direction.
+- `agent_log.txt` is the compact chronology of recent changes and the first place to check for what landed most recently.
 - `game_summary.md` remains the current source of truth unless the Planner explicitly promotes newer design decisions into `Game_Design.md`.
 - `Game_Design.md` is the detailed coder spec and numeric baseline.
 - `QA_TRACKER.md` is the live validation queue, not the design source.
@@ -78,7 +78,7 @@ These slices are substantially in place and should not be rebuilt unless a defec
 - Expanded regression coverage up to the current 17-test suite.
 
 ## Open Work Queue
-Treat these as the current coder-facing backlog. Work from top to bottom unless a newer `agent_log.json` entry reprioritizes them.
+Treat these as the current coder-facing backlog. Work from top to bottom unless a newer `agent_log.txt` entry reprioritizes them.
 
 ### Slice 1: Re-verify core tower behaviors
 Status: `In Progress`
@@ -167,13 +167,13 @@ Primary files:
 ## Recommended Next Steps
 If a coding agent starts fresh today, this is the shortest sensible path:
 
-1. Read the latest `agent_log.json` entries first.
+1. Read the latest `agent_log.txt` entries first.
 2. Read the open items in `QA_TRACKER.md`.
 3. Run `python -m pytest tests/test_simulation.py`.
 4. Run `python main.py`.
 5. Reproduce the oldest still-open `verify_fix` objective in live play.
 6. Fix only the smallest unresolved slice that has direct evidence.
-7. Update `QA_TRACKER.md` and `agent_log.json` after the change lands.
+7. Update `QA_TRACKER.md` and `agent_log.txt` after the change lands.
 
 ## From-Scratch Rebuild Order
 If the project had to be rebuilt from zero code, rebuild in this order:

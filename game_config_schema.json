@@ -361,6 +361,65 @@
           "orb_lifetime_seconds": {
             "type": "number",
             "exclusiveMinimum": 0
+          },
+          "secondary_mode": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "purchase_cost": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "fire_rate_multiplier": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "shot_cost_multiplier": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "snake_speed_multiplier": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "clean_multiplier": {
+                "type": "number",
+                "minimum": 0
+              },
+              "harvest_multiplier": {
+                "type": "number",
+                "minimum": 0
+              },
+              "damage_multiplier": {
+                "type": "number",
+                "minimum": 0
+              },
+              "turn_chance_override": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "effective_range_cap": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "launch_range_override": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "burst_count_override": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "forward_bias": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
           }
         }
       }
@@ -515,6 +574,10 @@
       "properties": {
         "enabled": {
           "type": "boolean"
+        },
+        "funding_chunk_cost": {
+          "type": "integer",
+          "minimum": 1
         },
         "funding_step_percent": {
           "type": "integer",

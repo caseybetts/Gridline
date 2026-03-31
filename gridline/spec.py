@@ -333,6 +333,7 @@ def load_game_spec(path: str | Path = "game_config.json") -> GameSpec:
         hardpoint_count=int(tower_placement.get("hardpoint_count", spec.hardpoint_count)),
         starting_coins=int(economy.get("starting_coins", spec.starting_coins)),
         harvest_income_green=tuple(economy.get("green_harvest_income_by_intensity", spec.harvest_income_green)),
+        power_funding_chunk_cost=int(power_tower.get("funding_chunk_cost", spec.power_funding_chunk_cost)),
         corruption_failure_threshold=float(run.get("corruption_loss_threshold_percent", spec.corruption_failure_threshold)),
         level_interval=float(run.get("level_up_interval_seconds", spec.level_interval)),
         spread_interval=spread_interval,
@@ -393,6 +394,7 @@ def _load_towers_from_config(raw_towers: list[dict[str, object]], spec: GameSpec
         if tower_id not in towers:
             continue
         current = towers[tower_id]
+        secondary_mode = _load_secondary_mode_from_config(raw.get("secondary_mode"), current.secondary_mode)
         towers[tower_id] = replace(
             current,
             name=str(raw.get("display_name", current.name)),
@@ -408,14 +410,8 @@ def _load_towers_from_config(raw_towers: list[dict[str, object]], spec: GameSpec
             turn_chance=_turn_chance_from_behavior(str(raw.get("path_behavior", "")), current.turn_chance),
             grid_access_tier_start=str(raw.get("grid_access_start", current.grid_access_tier_start)),
             burst_count=int(raw.get("burst_count", current.burst_count)),
+            secondary_mode=secondary_mode,
         )
-        if tower_id == "seed_tower":
-            seed_targeting = raw.get("seed_targeting", {})
-            if isinstance(seed_targeting, dict):
-                towers[tower_id] = replace(
-                    towers[tower_id],
-                    secondary_mode=towers[tower_id].secondary_mode,
-                )
     return towers
 
 
@@ -454,6 +450,27 @@ def _seed_target_defaults(raw_towers: list[dict[str, object]], spec: GameSpec) -
     )
 
 
+def _load_secondary_mode_from_config(raw_mode: object, fallback: TowerModeSpec | None) -> TowerModeSpec | None:
+    if fallback is None or not isinstance(raw_mode, dict):
+        return fallback
+    return replace(
+        fallback,
+        name=str(raw_mode.get("name", fallback.name)),
+        purchase_cost=int(raw_mode.get("purchase_cost", fallback.purchase_cost)),
+        fire_rate_multiplier=float(raw_mode.get("fire_rate_multiplier", fallback.fire_rate_multiplier)),
+        shot_cost_multiplier=float(raw_mode.get("shot_cost_multiplier", fallback.shot_cost_multiplier)),
+        snake_speed_multiplier=float(raw_mode.get("snake_speed_multiplier", fallback.snake_speed_multiplier)),
+        clean_multiplier=float(raw_mode.get("clean_multiplier", fallback.clean_multiplier)),
+        harvest_multiplier=float(raw_mode.get("harvest_multiplier", fallback.harvest_multiplier)),
+        damage_multiplier=float(raw_mode.get("damage_multiplier", fallback.damage_multiplier)),
+        turn_chance_override=_optional_float(raw_mode.get("turn_chance_override"), fallback.turn_chance_override),
+        effective_range_cap=_optional_float(raw_mode.get("effective_range_cap"), fallback.effective_range_cap),
+        launch_range_override=_optional_float(raw_mode.get("launch_range_override"), fallback.launch_range_override),
+        burst_count_override=_optional_int(raw_mode.get("burst_count_override"), fallback.burst_count_override),
+        forward_bias=_optional_float(raw_mode.get("forward_bias"), fallback.forward_bias),
+    )
+
+
 def _config_speed(raw_speed: float, fallback: float) -> float:
     if raw_speed <= 0:
         return fallback
@@ -468,6 +485,18 @@ def _config_range(raw_range: float, fallback: float) -> float:
     if raw_range <= 30:
         return raw_range * 24.0
     return raw_range
+
+
+def _optional_float(value: object, fallback: float | None) -> float | None:
+    if value is None:
+        return fallback
+    return float(value)
+
+
+def _optional_int(value: object, fallback: int | None) -> int | None:
+    if value is None:
+        return fallback
+    return int(value)
 
 
 def _turn_chance_from_behavior(path_behavior: str, fallback: float) -> float:

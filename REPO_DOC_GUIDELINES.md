@@ -57,36 +57,36 @@ Not for:
 Think of it as: how to build the game in code, and how to recover if the
 codebase is lost.
 
-## CURRENT_HANDOFFS.md
+## agent_log.txt
 
-  Purpose: short-lived coordination sheet.
+  Purpose: lightweight project chronology.
   Scope:
-
-- latest actionable handoff per role
-- immediate next work
-Not for:
-- durable requirements
-- full project state
-- historical record
-Think of it as: what each agent should do next.
-
-## agent_log.json
-
-  Purpose: history and traceability.
-  Scope:
-
-- source-of-truth design changes
-- major implementation milestones
-- major bug-fix milestones
-- verification milestones
-- architecture changes
-- scope changes / deferrals
+- one short entry per meaningful work batch
+- enough information to reconstruct change order over time
+- quick pointers to related `OBJ-*`, `BUG-*`, or other references when applicable
   Not for:
-- routine handoffs
-- minor edits
-- "please update X"
-- repeated restatements of current work
-  Think of it as: audit trail.
+- full narrative handoffs
+- long explanations of reasoning
+- file-by-file changelogs
+- replacing source-of-truth docs
+  Think of it as: concise timeline.
+
+  Entry format:
+- use one plain-text line per entry in this exact order:
+  `[Timestamp][Agent][Change Made][Refs]`
+- keep `Change Made` to one short sentence
+- keep `Refs` compact, for example `[BUG-014, OBJ-013]` or `[]` if none apply
+- do not use JSON objects for entries
+
+  A simple filter is:
+- Log it if another future agent would benefit from seeing that this work happened in sequence.
+- Do not log it if it only says "processed inbox" or repeats unchanged status.
+
+  Example:
+- `[2026-03-28T10:30:00-06:00][Coder][Exposed power funding chunk cost to config and tuned live economy values for BUG-014 retest.][BUG-014, OBJ-013, OBJ-014]`
+- The bracketed line format above is the active rule and supersedes older agent-log wording.
+- Do not log it if it only says “processed inbox, updated handoff,
+  waiting for next role.”
 
 ## QA_TRACKER.md
 
@@ -108,7 +108,7 @@ Think of it as: what still needs to be proven.
 - Game_Design.md = gameplay spec
 - CODER_PROJECT_GUIDE.md = engineering/rebuild guide
 - CURRENT_HANDOFFS.md = latest actionable work
-- agent_log.json = history
+- agent_log.txt = chronology of meaningful changes
 - QA_TRACKER.md = validation
 
 ### The clearest one-line definitions would be:
@@ -117,7 +117,7 @@ Think of it as: what still needs to be proven.
 - Game_Design.md: "How should it behave?"
 - CODER_PROJECT_GUIDE.md: "How do we build or rebuild it?"
 - CURRENT_HANDOFFS.md: "What should each role do right now?"
-- agent_log.json: "What happened and why?"
+- agent_log.txt: "What changed, and when?"
 - QA_TRACKER.md: "What still needs verification?"
 
 ## Conflict Resolution
@@ -129,7 +129,7 @@ Think of it as: what still needs to be proven.
 3. `CURRENT_HANDOFFS.md`
 4. `CODER_PROJECT_GUIDE.md`
 5. `QA_TRACKER.md`
-6. `agent_log.json`
+6. `agent_log.txt`
 
   Lower number wins.
   If a lower-priority document conflicts with a higher-priority one,
@@ -142,7 +142,7 @@ Think of it as: what still needs to be proven.
 1. `repo_doc_guidelines.md`
 2. `CURRENT_HANDOFFS.md`
 3. `game_summary.md`
-4. `agent_log.json`
+4. `agent_log.txt`
 
   Designer:
 
@@ -150,7 +150,7 @@ Think of it as: what still needs to be proven.
 2. `CURRENT_HANDOFFS.md`
 3. `game_summary.md`
 4. `Game_Design.md`
-5. `agent_log.json`
+5. `agent_log.txt`
 
   Coder:
 
@@ -160,7 +160,7 @@ Think of it as: what still needs to be proven.
 4. `game_summary.md`
 5. `Game_Design.md`
 6. `QA_TRACKER.md`
-7. `agent_log.json`
+7. `agent_log.txt`
 
   Tester:
 
@@ -169,22 +169,21 @@ Think of it as: what still needs to be proven.
 3. `game_summary.md`
 4. `Game_Design.md`
 5. `QA_TRACKER.md`
-6. `agent_log.json`
+6. `agent_log.txt`
 
 ## Archive And Trim Rules
 
   Use these rules to keep coordination files small and easy to scan:
-- Keep `agent_log.json` as the active recent-history log, not the
+- Keep `agent_log.txt` as the active recent-history log, not the
   permanent full archive.
 - Archive and trim it whenever it becomes long enough that agents must
   scan excessive history to find current work.
 - When trimming, move or copy the full current file into `archive/`
   using a timestamped filename.
-- After trimming, create a fresh `agent_log.json` that keeps:
-  - the schema/header metadata
-  - only the most recent relevant entries needed for continuity
-- Prefer keeping only the last few entries that still affect active
-  work.
+- After trimming, create a fresh `agent_log.txt` that keeps:
+  - either no lines at all or only a few most recent lines if continuity requires them
+- Prefer keeping this file very short. The archive carries the long
+  history.
 
 ## CURRENT_HANDOFFS.md
 
@@ -201,7 +200,7 @@ Think of it as: what still needs to be proven.
 - `Deferred` is optional and should contain at most one item.
 - Durable decisions belong in `game_summary.md`, `Game_Design.md`,
   `CODER_PROJECT_GUIDE.md`, or `QA_TRACKER.md`.
-- Historical record belongs in `agent_log.json`.
+- Historical record belongs in `agent_log.txt`.
 - Agents do not need to check `Deferred` while `Current Inbox` contains
   a clear active instruction.
 - Agents should check `Deferred` when `Current Inbox` is `empty` or when
@@ -235,18 +234,19 @@ Think of it as: what still needs to be proven.
 
   When Agent A needs to hand something to Agent B:
 
-1. Read Agent B's section first.
-2. If Agent B's `Current Inbox` is `empty`, write the new message there.
-3. If Agent B's `Current Inbox` already has a message:
-  - If the new message supersedes the old one, replace `Current Inbox`.
-  - If the new message is lower priority and `Deferred` is `empty`,
-  write it in `Deferred`.
-  - If `Deferred` is already occupied, do not stack more notes.
-  Consolidate to one concise deferred item or move durable detail into the
-  proper source-of-truth doc and leave only a short pointer here.
-4. Keep the handoff concise and action-oriented.
+- Write that handoff into Agent B's Current Inbox field (updating only the User / Project Owner section is NOT sufficient).
+- Read Agent B's section first before updating:
+  a. If Agent B's `Current Inbox` is `empty`, write the new message there.
+  b. If Agent B's `Current Inbox` already has a message:
+    - If the new message supersedes the old one, replace `Current Inbox`.
+    - If the new message is lower priority and `Deferred` is `empty`,
+    write it in `Deferred`.
+    - If `Deferred` is already occupied, do not stack more notes.
+    Consolidate to one concise deferred item or move durable detail into the
+    proper source-of-truth doc and leave only a short pointer here.
+- Keep the handoff concise and action-oriented.
 
-# Receiver Flow
+### Receiver Flow
 
   When an agent starts work on its own section:
 
@@ -284,12 +284,12 @@ Think of it as: what still needs to be proven.
 
 ### User/Project Owner Section
   Field meaning:
+  - Suggested Next Agent: the role you should likely run next.
+  - Suggested Next Action: the first thing that next agent should do.
   - Latest Agent: the last agent role that worked meaningfully on the
     project.
   - Last Outcome: one-line summary of what changed, was decided, or was
     verified.
-  - Suggested Next Agent: the role you should likely run next.
-  - Suggested Next Action: the first thing that next agent should do.
 
   Ownership rule:
   - The agent finishing its turn should update this section before
@@ -315,4 +315,3 @@ Think of it as: what still needs to be proven.
   In short:
   - `CURRENT_HANDOFFS.md` wins for sequencing.
   - Source-of-truth docs win for lasting content.
-

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import re
 import tkinter as tk
 
 from .simulation import GameSimulation, Orb
@@ -169,7 +170,9 @@ class GridlineApp:
         self.action_buttons: dict[str, tk.Button] = {}
         self.utility_buttons: dict[str, tk.Button] = {}
         self.action_groups: dict[str, tk.Frame] = {}
+        self.action_group_headers: dict[str, tk.Label] = {}
         self.action_group_keys: dict[str, list[str]] = {}
+        self._last_action_selection_signature: tuple[str | None, str] | None = None
         self._build_sidebar()
         self.canvas.bind("<Button-1>", self._on_canvas_click)
         self.root.bind("<Escape>", lambda _event: self.root.destroy())
@@ -195,6 +198,8 @@ class GridlineApp:
 
         details_frame = tk.Frame(self.sidebar, bg=self.spec.visuals.sidebar)
         details_frame.pack(fill=tk.X, padx=16, pady=(0, 8))
+        details_frame.pack_propagate(False)
+        details_frame.configure(height=240)
         self._section_label(details_frame, "Selection").pack(fill=tk.X, pady=(0, 4))
         tk.Label(
             details_frame,
@@ -238,44 +243,48 @@ class GridlineApp:
             "build",
             "Build",
             [
-                ("build_basic_tower", "Build Basic", lambda: self.sim.build_tower("basic_tower")),
-                ("build_seed_tower", "Build Seed", lambda: self.sim.build_tower("seed_tower")),
-                ("build_burst_tower", "Build Burst", lambda: self.sim.build_tower("burst_tower")),
+                ("build_basic_tower", "Basic", lambda: self.sim.build_tower("basic_tower")),
+                ("build_seed_tower", "Seed", lambda: self.sim.build_tower("seed_tower")),
+                ("build_burst_tower", "Burst", lambda: self.sim.build_tower("burst_tower")),
             ],
+            columns=3,
         )
         self._build_action_group(
             "tower",
             "Tower Controls",
             [
-                ("buy_secondary", "Buy Secondary", lambda: self.sim.purchase_secondary_mode()),
-                ("swap_mode", "Switch Mode", lambda: self.sim.toggle_selected_mode()),
-                ("upgrade_fire_rate", "Upgrade Fire Rate", lambda: self.sim.upgrade_selected_tower_type("fire_rate")),
+                ("buy_secondary", "Buy Mode", lambda: self.sim.purchase_secondary_mode()),
+                ("swap_mode", "Swap Mode", lambda: self.sim.toggle_selected_mode()),
+                ("upgrade_fire_rate", "Fire Rate", lambda: self.sim.upgrade_selected_tower_type("fire_rate")),
                 ("upgrade_hp", "Upgrade HP", lambda: self.sim.upgrade_selected_tower_type("hp")),
-                ("upgrade_snake_speed", "Upgrade Snake Speed", lambda: self.sim.upgrade_selected_tower_type("snake_speed")),
+                ("upgrade_snake_speed", "Snake Speed", lambda: self.sim.upgrade_selected_tower_type("snake_speed")),
                 ("upgrade_hit_damage", "Upgrade Damage", lambda: self.sim.upgrade_selected_tower_type("hit_damage")),
-                ("upgrade_shot_range", "Upgrade Shot Range", lambda: self.sim.upgrade_selected_tower_type("shot_range")),
-                ("upgrade_grid_access_tier", "Upgrade Tier", lambda: self.sim.upgrade_selected_tower_type("grid_access_tier")),
+                ("upgrade_shot_range", "Shot Range", lambda: self.sim.upgrade_selected_tower_type("shot_range")),
+                ("upgrade_grid_access_tier", "Grid Tier", lambda: self.sim.upgrade_selected_tower_type("grid_access_tier")),
             ],
+            columns=2,
         )
         self._build_action_group(
             "seed",
             "Seed Levers",
             [
-                ("seed_closest_plus", "Seed Closest +5", lambda: self.sim.adjust_seed_lever("closest", 5)),
-                ("seed_closest_minus", "Seed Closest -5", lambda: self.sim.adjust_seed_lever("closest", -5)),
-                ("seed_color_plus", "Seed Red +5", lambda: self.sim.adjust_seed_lever("color", 5)),
-                ("seed_color_minus", "Seed Red -5", lambda: self.sim.adjust_seed_lever("color", -5)),
-                ("seed_darkest_plus", "Seed Darkest +5", lambda: self.sim.adjust_seed_lever("darkest", 5)),
-                ("seed_darkest_minus", "Seed Darkest -5", lambda: self.sim.adjust_seed_lever("darkest", -5)),
+                ("seed_closest_plus", "Close +5", lambda: self.sim.adjust_seed_lever("closest", 5)),
+                ("seed_closest_minus", "Close -5", lambda: self.sim.adjust_seed_lever("closest", -5)),
+                ("seed_color_plus", "Red +5", lambda: self.sim.adjust_seed_lever("color", 5)),
+                ("seed_color_minus", "Red -5", lambda: self.sim.adjust_seed_lever("color", -5)),
+                ("seed_darkest_plus", "Dark +5", lambda: self.sim.adjust_seed_lever("darkest", 5)),
+                ("seed_darkest_minus", "Dark -5", lambda: self.sim.adjust_seed_lever("darkest", -5)),
             ],
+            columns=2,
         )
         self._build_action_group(
             "power",
             "Power",
             [
-                ("fund_power", "Fund Power +10%", lambda: self.sim.fund_power()),
-                ("deploy_power", "Deploy Power", lambda: self.sim.deploy_power_to_selected()),
+                ("fund_power", "Fund +10%", lambda: self.sim.fund_power()),
+                ("deploy_power", "Deploy", lambda: self.sim.deploy_power_to_selected()),
             ],
+            columns=2,
         )
 
         utility_frame = tk.Frame(self.sidebar, bg=self.spec.visuals.sidebar)
@@ -291,23 +300,47 @@ class GridlineApp:
             self.feedback_text.set(availability[key][1])
             self._refresh_sidebar()
             return
+        before_snapshot = self.sim.selected_object_snapshot()
+        before_power_percent = self.sim.power.funding_percent
         command()
-        self.feedback_text.set("")
+        self.feedback_text.set(self._success_feedback(key, before_snapshot, before_power_percent))
         self._refresh_sidebar()
 
-    def _build_action_group(self, group_key: str, title: str, actions: list[tuple[str, str, object]]) -> None:
+    def _build_action_group(self, group_key: str, title: str, actions: list[tuple[str, str, object]], columns: int = 1) -> None:
         group_frame = tk.Frame(self.action_inner, bg=self.spec.visuals.sidebar)
-        self._section_label(group_frame, title).pack(fill=tk.X, pady=(0, 4))
+        header = self._section_label(group_frame, title)
+        header.pack(fill=tk.X, pady=(0, 4))
+        button_shell = tk.Frame(group_frame, bg=self.spec.visuals.sidebar)
+        button_shell.pack(fill=tk.X)
+        for column in range(columns):
+            button_shell.grid_columnconfigure(column, weight=1, uniform=f"{group_key}_actions")
         keys: list[str] = []
+        wraplength = self._button_wraplength(columns)
         for key, label, command in actions:
-            button = self._make_button(group_frame, key, label, command)
-            button.pack(fill=tk.X, pady=3)
+            button = self._make_button(button_shell, key, label, command, wraplength)
+            index = len(keys)
+            button.grid(
+                row=index // columns,
+                column=index % columns,
+                sticky="ew",
+                padx=3,
+                pady=3,
+            )
             self.action_buttons[key] = button
             keys.append(key)
+        group_frame.pack(fill=tk.X, pady=(0, 10))
         self.action_groups[group_key] = group_frame
+        self.action_group_headers[group_key] = header
         self.action_group_keys[group_key] = keys
 
-    def _make_button(self, parent: tk.Widget, key: str, label: str, command) -> tk.Button:
+    def _button_wraplength(self, columns: int) -> int:
+        inner_width = self.spec.visuals.sidebar_width - 32
+        cell_width = max(88, (inner_width - max(0, columns - 1) * 6) // max(1, columns))
+        return max(56, cell_width - 28)
+
+    def _make_button(self, parent: tk.Widget, key: str, label: str, command, wraplength: int | None = None) -> tk.Button:
+        if wraplength is None:
+            wraplength = self._button_wraplength(1)
         return tk.Button(
             parent,
             text=label,
@@ -318,6 +351,12 @@ class GridlineApp:
             activeforeground=self.spec.visuals.text,
             relief=tk.FLAT,
             disabledforeground="#6F8195",
+            anchor="w",
+            justify="left",
+            wraplength=wraplength,
+            height=2,
+            padx=10,
+            pady=6,
         )
 
     def _section_label(self, parent: tk.Widget, text: str) -> tk.Label:
@@ -372,14 +411,17 @@ class GridlineApp:
 
     def _refresh_sidebar(self) -> None:
         hud = self.sim.hud_snapshot()
+        recent_harvest = hud["recent_harvest_event"]
         self.status_text.set(
             "\n".join(
                 [
+                    f"Pressure: {self._pressure_badge(hud)}",
+                    f"Corruption: {self._meter_bar(hud['corruption_percent'], hud['failure_threshold'])} {hud['corruption_percent']:.1f}% / {hud['failure_threshold']:.0f}%",
                     f"Coins: {hud['coins']}",
-                    f"Corruption: {hud['corruption_percent']:.1f}% / {hud['failure_threshold']:.0f}%",
+                    f"Power: {self._power_status_text(hud)}",
                     f"Level: {hud['level']}  Next: {hud['level_time_remaining']:.1f}s",
                     f"Orbs: {hud['active_orb_count']}  Shots/s: {hud['shots_recent']}",
-                    f"Power: {hud['power_percent']}%{' READY' if hud['power_charged'] else ''}",
+                    f"Harvest: {self._recent_harvest_text(recent_harvest)}",
                     f"Surge: {'ACTIVE' if hud['surge_active'] else 'idle'}",
                     "Status: GAME OVER" if hud["game_over"] else "Status: running",
                 ]
@@ -399,24 +441,34 @@ class GridlineApp:
                 [
                     f"State: {selected['name']}",
                     f"HP: {selected['hp']:.0f}/{selected['max_hp']:.0f}",
-                    f"Fire: {fire_text}",
+                    f"Fire: {self._state_badge(selected['fire_ready'], 'READY', fire_text)}",
                     f"Time Left: {selected['time_remaining']:.1f}s",
+                    f"Economy: free shots  Harvest {self.spec.power_harvest_per_unit_distance:.3f}/u",
                     f"Suspended Tower: {selected['underlying_tower_name'] or 'none'}",
                 ]
             )
         elif selected["kind"] == "tower":
             tower = selected["tower"]
             fire_text = "READY" if selected["fire_ready"] else f"{selected['fire_cooldown']:.1f}s"
+            swap_text = f"{selected['swap_cooldown']:.1f}s"
+            economy = hud["selected_tower_economy"]
             lines.extend(
                 [
                     f"Tower: {selected['name']}",
                     f"HP: {selected['hp']:.0f}/{selected['max_hp']:.0f}",
                     f"Mode: {selected['mode_name']}",
-                    f"Fire: {fire_text}",
+                    f"Fire: {self._state_badge(selected['fire_ready'], 'READY', fire_text)}",
                     f"{selected['secondary_mode_name']} unlocked: {'Yes' if selected['secondary_unlocked'] else 'No'}",
-                    f"Swap cooldown: {selected['swap_cooldown']:.1f}s",
+                    f"Swap: {self._state_badge(selected['swap_cooldown'] <= 0, 'READY', swap_text)}",
                 ]
             )
+            if economy is not None:
+                lines.extend(
+                    [
+                        f"Economy: {economy['shot_cost']:.1f}c/shot  Clean {economy['clean_per_unit']:.3f}/u",
+                        f"Harvest: {economy['harvest_per_unit']:.3f}/u  Recent +{economy['recent_harvest_income']}c / {economy['window_seconds']:.0f}s",
+                    ]
+                )
             if tower.archetype == "seed_tower":
                 lines.extend(
                     [
@@ -426,33 +478,34 @@ class GridlineApp:
                     ]
                 )
         else:
-            lines.append("Tower: empty")
+            lines.extend(
+                [
+                    "Tower: empty",
+                    "Build priorities:",
+                    *self._build_option_summaries(),
+                ]
+            )
         self.detail_text.set("\n".join(lines))
         self.upgrade_text.set("\n".join(hud["upgrade_preview"]))
         self._update_button_states(hud["selected_object"], hud["action_availability"])
+        self._maybe_reset_action_scroll(selected)
 
     def _update_button_states(self, selected: dict[str, object], availability: dict[str, tuple[bool, str]]) -> None:
         context = selected.get("kind", "none")
-        visible_groups = ["power"]
+        self._update_context_action_labels(selected, availability)
+        tower = selected.get("tower")
+        active_groups = {"power"}
         if context in {"none", "empty"}:
-            visible_groups.insert(0, "build")
+            active_groups.add("build")
         elif context == "tower":
-            visible_groups = ["tower", "seed", "power"]
+            active_groups.add("tower")
+            if tower is not None and tower.archetype == "seed_tower":
+                active_groups.add("seed")
         elif context == "power":
-            visible_groups = ["power"]
-        self._update_context_action_labels(selected)
+            active_groups.add("power")
 
-        for group_key, group_frame in self.action_groups.items():
-            if group_key == "seed":
-                tower = selected.get("tower")
-                should_show = context == "tower" and tower is not None and tower.archetype == "seed_tower"
-            else:
-                should_show = group_key in visible_groups
-            if should_show:
-                if not group_frame.winfo_ismapped():
-                    group_frame.pack(fill=tk.X, pady=(0, 10))
-            elif group_frame.winfo_ismapped():
-                group_frame.pack_forget()
+        for group_key, header in self.action_group_headers.items():
+            header.configure(fg=self.spec.visuals.text if group_key in active_groups else self.spec.visuals.muted_text)
 
         for key, button in self.action_buttons.items():
             enabled, _reason = availability.get(key, (True, ""))
@@ -460,19 +513,142 @@ class GridlineApp:
         for button in self.utility_buttons.values():
             button.configure(state=tk.NORMAL)
 
-    def _update_context_action_labels(self, selected: dict[str, object]) -> None:
-        buy_label = "Buy Secondary"
-        swap_label = "Switch Mode"
+    def _update_context_action_labels(self, selected: dict[str, object], availability: dict[str, tuple[bool, str]]) -> None:
+        buy_label = "Buy Mode"
+        swap_label = "Swap Mode"
+        build_basic_label = f"Basic | {self.spec.towers['basic_tower'].build_cost}c"
+        build_seed_label = f"Seed | {self.spec.towers['seed_tower'].build_cost}c"
+        build_burst_label = f"Burst | {self.spec.towers['burst_tower'].build_cost}c"
+        fund_power_label = f"Fund +10% | {self.spec.power_funding_chunk_cost}c"
+        deploy_power_label = "Deploy"
         if selected.get("kind") == "tower":
             secondary_mode_name = selected.get("secondary_mode_name")
             if secondary_mode_name:
-                buy_label = f"Buy {secondary_mode_name}"
+                buy_label = f"Buy {self._short_mode_name(str(secondary_mode_name))}"
                 if selected.get("mode") == "secondary":
-                    swap_label = "Switch to Default Mode"
+                    swap_label = "To Default"
                 else:
-                    swap_label = f"Switch to {secondary_mode_name}"
-        self.action_buttons["buy_secondary"].configure(text=buy_label)
-        self.action_buttons["swap_mode"].configure(text=swap_label)
+                    swap_label = f"To {self._short_mode_name(str(secondary_mode_name))}"
+        if self.sim.power.charged:
+            deploy_power_label = "Deploy | Ready"
+        elif self.sim.power.active_hardpoint_id is not None:
+            deploy_power_label = f"Deploy | {self.sim.power.time_remaining:.1f}s"
+        label_map = {
+            "buy_secondary": buy_label,
+            "swap_mode": swap_label,
+            "build_basic_tower": build_basic_label,
+            "build_seed_tower": build_seed_label,
+            "build_burst_tower": build_burst_label,
+            "fund_power": fund_power_label,
+            "deploy_power": deploy_power_label,
+        }
+        for key, label in label_map.items():
+            enabled, reason = availability.get(key, (True, ""))
+            self.action_buttons[key].configure(text=self._action_label(label, enabled, reason))
+
+    def _recent_harvest_text(self, recent_harvest: dict[str, object] | None) -> str:
+        if recent_harvest is None:
+            return "no recent income"
+        return (
+            f"+{recent_harvest['amount']}c via {recent_harvest['tower_name']} / "
+            f"{recent_harvest['mode_name']} ({recent_harvest['age']:.1f}s)"
+        )
+
+    def _maybe_reset_action_scroll(self, selected: dict[str, object]) -> None:
+        selection_signature = (self.sim.selected_hardpoint_id, str(selected.get("kind", "none")))
+        if selection_signature == self._last_action_selection_signature:
+            return
+        self._last_action_selection_signature = selection_signature
+        if selected.get("kind") != "empty":
+            return
+        self.action_canvas.after_idle(lambda: self.action_canvas.yview_moveto(0.0))
+
+    def _power_status_text(self, hud: dict[str, object]) -> str:
+        if self.sim.power.active_hardpoint_id is not None:
+            return f"[ACTIVE] {self._meter_bar(self.sim.power.time_remaining, self.spec.power_duration)} {self.sim.power.time_remaining:.1f}s"
+        if hud["power_charged"]:
+            return f"[READY] {self._meter_bar(10, 10)} 100%"
+        return f"[FUNDING] {self._meter_bar(hud['power_percent'], 100)} {hud['power_percent']}%"
+
+    def _build_option_summaries(self) -> list[str]:
+        return [
+            f"- Basic Tower ({self.spec.towers['basic_tower'].build_cost}c): reliable generalist; best defensive mode host.",
+            f"- Seed Tower ({self.spec.towers['seed_tower'].build_cost}c): strongest remote corruption response and map reach.",
+            f"- Burst Tower ({self.spec.towers['burst_tower'].build_cost}c): strongest local interception and panic control.",
+        ]
+
+    def _action_label(self, label: str, enabled: bool, reason: str) -> str:
+        if enabled or not reason:
+            return label
+        return f"{label} | {self._compact_reason(reason)}"
+
+    def _short_mode_name(self, mode_name: str) -> str:
+        return mode_name.replace(" Mode", "")
+
+    def _compact_reason(self, reason: str) -> str:
+        text = reason.strip().rstrip(".")
+        coin_match = re.fullmatch(r"Need (\d+) coins", text)
+        if coin_match is not None:
+            return f"Need {coin_match.group(1)}c"
+        replacements = {
+            "Blocked during power override": "Blocked: power active",
+            "Select a hardpoint": "Select hardpoint",
+            "Select a Seed Tower": "Select Seed Tower",
+            "Already fully funded": "Already funded",
+            "Hardpoint occupied": "Occupied",
+            "No stored charge": "Need stored charge",
+            "Charge already stored": "Charge stored",
+            "Already active": "Already active",
+            "Power already active": "Power active",
+        }
+        return replacements.get(text, text)
+
+    def _success_feedback(
+        self,
+        key: str,
+        before_snapshot: dict[str, object],
+        before_power_percent: int,
+    ) -> str:
+        if key.startswith("build_"):
+            return f"Built {key.removeprefix('build_').replace('_tower', '').replace('_', ' ').title()}."
+        if key == "buy_secondary":
+            mode_name = before_snapshot.get("secondary_mode_name", "Secondary")
+            return f"{mode_name} unlocked."
+        if key == "swap_mode":
+            after_snapshot = self.sim.selected_object_snapshot()
+            mode_name = after_snapshot.get("mode_name", "Mode")
+            return f"Switched to {mode_name}."
+        if key.startswith("upgrade_"):
+            return f"Upgraded {key.removeprefix('upgrade_').replace('_', ' ').title()}."
+        if key == "fund_power":
+            return f"Power funding: {before_power_percent}% -> {self.sim.power.funding_percent}%."
+        if key == "deploy_power":
+            return "Power deployed."
+        return ""
+
+    def _meter_bar(self, current: float, maximum: float, width: int = 10) -> str:
+        if maximum <= 0:
+            return "[" + "." * width + "]"
+        ratio = max(0.0, min(1.0, current / maximum))
+        filled = int(round(ratio * width))
+        if ratio > 0 and filled == 0:
+            filled = 1
+        return "[" + "#" * filled + "." * (width - filled) + "]"
+
+    def _pressure_badge(self, hud: dict[str, object]) -> str:
+        if hud["game_over"]:
+            return "[FAILED]"
+        ratio = 0.0 if hud["failure_threshold"] <= 0 else hud["corruption_percent"] / hud["failure_threshold"]
+        if ratio >= 0.85:
+            return "[CRITICAL]"
+        if ratio >= 0.55:
+            return "[HIGH]"
+        if ratio >= 0.25:
+            return "[RISING]"
+        return "[STABLE]"
+
+    def _state_badge(self, ready: bool, ready_text: str, waiting_text: str) -> str:
+        return f"[{ready_text}]" if ready else f"[WAIT] {waiting_text}"
 
     def _render(self) -> None:
         self.canvas.delete("all")
@@ -485,14 +661,14 @@ class GridlineApp:
             impact = self.sim.segment_impacts.get(segment_id)
             if impact is not None:
                 effect_strength = impact.time_remaining / impact.duration if impact.duration > 0 else 0.0
-                flash_color = self._impact_color(impact.color, impact.intensity, effect_strength)
+                flash_color = self._impact_color(impact.color, impact.intensity, impact.effect, effect_strength)
                 self.canvas.create_line(
                     a.x,
                     a.y,
                     b.x,
                     b.y,
                     fill=flash_color,
-                    width={"large": self.spec.visuals.large_line_width, "medium": self.spec.visuals.medium_line_width, "small": self.spec.visuals.small_line_width}[segment.tier] + 2.0 * effect_strength,
+                    width={"large": self.spec.visuals.large_line_width, "medium": self.spec.visuals.medium_line_width, "small": self.spec.visuals.small_line_width}[segment.tier] + 3.0 * effect_strength,
                 )
 
         for hardpoint_state in self.sim.hardpoints.values():
@@ -557,6 +733,19 @@ class GridlineApp:
             color = blend_hex(self.spec.visuals.red_levels[1], self.spec.visuals.playfield_overlay, 0.9 - progress * 0.7)
             self.canvas.create_oval(node.x - radius, node.y - radius, node.x + radius, node.y + radius, outline=color, width=max(1.0, 3.0 - progress * 2.0))
 
+        for popup in self.sim.harvest_popups:
+            x, y = self.sim.topology.segment_midpoint(popup.segment_id)
+            progress = 1.0 - (popup.time_remaining / popup.duration if popup.duration > 0 else 1.0)
+            text_y = y - (12.0 + progress * 18.0)
+            color = blend_hex("#FFD779", self.spec.visuals.playfield_overlay, 0.95 - progress * 0.55)
+            self.canvas.create_text(
+                x,
+                text_y,
+                text=popup.label,
+                fill=color,
+                font=("Consolas", 10, "bold"),
+            )
+
         self.canvas.create_text(16, 16, anchor="nw", fill=self.spec.visuals.text, font=("Consolas", 12, "bold"), text=f"Coins {self.sim.coins}   Corruption {self.sim.corruption_percent():.1f}%   Orbs {len(self.sim.orbs)}   Enemies {len(self.sim.enemies)}")
         if self.sim.surge_time_remaining > 0:
             self.canvas.create_text(16, 36, anchor="nw", fill=self.spec.visuals.warning, font=("Consolas", 11, "bold"), text=f"SURGE ACTIVE {self.sim.surge_time_remaining:.1f}s")
@@ -573,7 +762,12 @@ class GridlineApp:
             return self.spec.visuals.green_levels[intensity - 1]
         return {"large": self.spec.visuals.neutral_large, "medium": self.spec.visuals.neutral_medium, "small": self.spec.visuals.neutral_small}[tier]
 
-    def _impact_color(self, color: str, intensity: int, effect_strength: float) -> str:
+    def _impact_color(self, color: str, intensity: int, effect: str, effect_strength: float) -> str:
+        if effect == "clean":
+            base = self.spec.visuals.neutral_large if color == "blue" else self.spec.visuals.green_levels[0]
+            return blend_hex(base, self.spec.visuals.orb_head, min(1.0, 0.30 + effect_strength * 0.45))
+        if effect == "harvest":
+            return blend_hex("#FFD779", self.spec.visuals.playfield_overlay, 0.30 + effect_strength * 0.55)
         if color == "red" and intensity > 0:
             base = self.spec.visuals.red_levels[max(0, intensity - 1)]
         elif color == "green" and intensity > 0:
