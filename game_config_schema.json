@@ -441,11 +441,69 @@
           "type": "number",
           "exclusiveMinimum": 0
         },
+        "green_spread_interval_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
         "enemy_can_seed_new_sites": {
           "type": "boolean"
         },
         "enemy_can_boost_spread_speed": {
           "type": "boolean"
+        },
+        "red_spread_chance_by_tier": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["large", "medium", "small"],
+          "properties": {
+            "large": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "medium": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "small": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "green_spread_chance_by_tier": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["large", "medium", "small"],
+          "properties": {
+            "large": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "medium": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "small": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "red_intensity_growth_chance": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "green_intensity_growth_chance": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
         },
         "spread_profile_by_tier": {
           "type": "object",

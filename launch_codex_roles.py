@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 
-ROLES = ("Planner", "Designer", "Coder", "Tester")
+ROLES = ("Planner", "Designer", "Coder", "Tester", "Auditor")
 DEFAULT_TERMINAL_MODE = "tabs"
 
 
@@ -41,6 +42,10 @@ def build_powershell_command(role: str, workspace: Path, prompt_path: Path) -> s
     )
 
 
+def encode_powershell_command(command: str) -> str:
+    return base64.b64encode(command.encode("utf-16le")).decode("ascii")
+
+
 def get_prompt_path(role: str, workspace: Path) -> Path:
     prompt_path = workspace / f"{role}_Prompt.md"
 
@@ -52,24 +57,25 @@ def get_prompt_path(role: str, workspace: Path) -> Path:
 
 def build_console_command(role: str, workspace: Path) -> list[str]:
     prompt_path = get_prompt_path(role, workspace)
-    ps_command = build_powershell_command(role, workspace, prompt_path)
-    return ["powershell.exe", "-NoExit", "-Command", ps_command]
+    encoded_command = encode_powershell_command(build_powershell_command(role, workspace, prompt_path))
+    return ["powershell.exe", "-NoExit", "-EncodedCommand", encoded_command]
 
 
 def build_wt_tab_command(role: str, workspace: Path) -> list[str]:
     prompt_path = get_prompt_path(role, workspace)
-    ps_command = build_powershell_command(role, workspace, prompt_path)
+    encoded_command = encode_powershell_command(build_powershell_command(role, workspace, prompt_path))
     return [
         "new-tab",
         "--title",
         role,
+        # Keep the role label even if PowerShell/Codex later rewrites the console title.
         "--suppressApplicationTitle",
         "-d",
         str(workspace),
         "powershell.exe",
         "-NoExit",
-        "-Command",
-        ps_command,
+        "-EncodedCommand",
+        encoded_command,
     ]
 
 

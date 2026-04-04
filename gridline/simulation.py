@@ -155,6 +155,26 @@ UPGRADE_DISPLAY = {
     "grid_access_tier": "Grid Tier",
 }
 
+PHASE_SEQUENCE = ("opening_containment", "escalation", "critical_load")
+PHASE_INFO = {
+    "opening_containment": {
+        "label": "Opening Containment",
+        "badge": "OPENING",
+        "banner_text": "Opener pressure window is active.",
+    },
+    "escalation": {
+        "label": "Escalation",
+        "badge": "ESCALATION",
+        "banner_text": "Role separation and funding pressure are rising.",
+    },
+    "critical_load": {
+        "label": "Critical Load",
+        "badge": "CRITICAL",
+        "banner_text": "Late-crisis recovery and power timing are live.",
+    },
+}
+PHASE_TRANSITION_BANNER_DURATION = 1.2
+
 
 class GameSimulation:
     def __init__(self, spec: GameSpec, seed: int = 7) -> None:
@@ -187,6 +207,10 @@ class GameSimulation:
         self.run_time = 0.0
         self.level = 1
         self.game_over = False
+        self.active_phase = "opening_containment"
+        self.highest_phase_reached = "opening_containment"
+        self.phase_transition_timer = 0.0
+        self.phase_transition_phase_id: str | None = None
         self.shots_fired_times: deque[float] = deque()
         self.spawn_timer = spec.base_spawn_interval
         self.spread_timer = spec.spread_interval
@@ -405,6 +429,7 @@ class GameSimulation:
     def update(self, dt: float) -> None:
         if self.game_over:
             return
+        self._update_phase_transition(dt)
         self.run_time += dt
         self.level_timer -= dt
         self.surge_roll_timer -= dt
@@ -427,8 +452,60 @@ class GameSimulation:
         self._spawn_enemies(dt)
         self._trim_shot_history()
         self._trim_harvest_history()
+        self._evaluate_phase_state()
         if self.corruption_percent() >= self.spec.corruption_failure_threshold:
             self.game_over = True
+
+    def _update_phase_transition(self, dt: float) -> None:
+        if self.phase_transition_timer <= 0:
+            self.phase_transition_timer = 0.0
+            self.phase_transition_phase_id = None
+            return
+        self.phase_transition_timer = max(0.0, self.phase_transition_timer - dt)
+        if self.phase_transition_timer <= 0:
+            self.phase_transition_phase_id = None
+
+    def phase_label(self, phase_id: str) -> str:
+        return PHASE_INFO[phase_id]["label"]
+
+    def phase_badge(self, phase_id: str) -> str:
+        return PHASE_INFO[phase_id]["badge"]
+
+    def phase_banner_text(self, phase_id: str) -> str:
+        return PHASE_INFO[phase_id]["banner_text"]
+
+    def _phase_rank(self, phase_id: str) -> int:
+        return PHASE_SEQUENCE.index(phase_id)
+
+    def _promote_phase(self, phase_id: str) -> None:
+        if self._phase_rank(phase_id) <= self._phase_rank(self.active_phase):
+            return
+        self.active_phase = phase_id
+        if self._phase_rank(phase_id) > self._phase_rank(self.highest_phase_reached):
+            self.highest_phase_reached = phase_id
+        self.phase_transition_phase_id = phase_id
+        self.phase_transition_timer = PHASE_TRANSITION_BANNER_DURATION
+
+    def _evaluate_phase_state(self) -> None:
+        corruption = self.corruption_percent()
+        surge_active = self.surge_time_remaining > 0
+        if self.level >= 9 or corruption >= 45 or (surge_active and corruption >= 35):
+            self._promote_phase("critical_load")
+            return
+        if self.level >= 4 or corruption >= 20:
+            self._promote_phase("escalation")
+
+    def phase_transition_snapshot(self) -> dict[str, object] | None:
+        if self.phase_transition_timer <= 0 or self.phase_transition_phase_id is None:
+            return None
+        return {
+            "phase_id": self.phase_transition_phase_id,
+            "label": self.phase_label(self.phase_transition_phase_id),
+            "badge": self.phase_badge(self.phase_transition_phase_id),
+            "banner_text": self.phase_banner_text(self.phase_transition_phase_id),
+            "time_remaining": self.phase_transition_timer,
+            "duration": PHASE_TRANSITION_BANNER_DURATION,
+        }
 
     def _update_towers(self, dt: float) -> None:
         for tower in list(self.towers.values()):
@@ -681,7 +758,7 @@ class GameSimulation:
     def _node_color_bucket(self, node_id: str) -> str:
         color = "blue"
         strongest = -1
-        for segment_id in self.topology.nodes[node_id].segment_ids:
+        for segment_id in sorted(self.topology.nodes[node_id].segment_ids):
             state = self.segment_states[segment_id]
             if state.color != "blue" and state.intensity > strongest:
                 strongest = state.intensity
@@ -1028,7 +1105,7 @@ class GameSimulation:
 
     def _seed_red_at_node(self, node_id: str, intensity: int) -> None:
         self.seed_pulses.append(SeedPulse(node_id=node_id, time_remaining=0.35, duration=0.35))
-        for segment_id in self.topology.nodes[node_id].segment_ids:
+        for segment_id in sorted(self.topology.nodes[node_id].segment_ids):
             state = self.segment_states[segment_id]
             if state.color == "green":
                 continue
@@ -1133,14 +1210,14 @@ class GameSimulation:
                 state.clean_progress = 0.0
                 state.harvest_progress = 0.0
 
-    def _neighbor_segments(self, segment_id: str) -> set[str]:
+    def _neighbor_segments(self, segment_id: str) -> list[str]:
         segment = self.topology.segments[segment_id]
-        result = set()
+        result: set[str] = set()
         for node_id in (segment.a, segment.b):
             for other_id in self.topology.adjacency[node_id]:
                 if other_id != segment_id:
                     result.add(other_id)
-        return result
+        return sorted(result)
 
     def _spawn_enemies(self, dt: float) -> None:
         self.spawn_timer -= dt
@@ -1636,6 +1713,12 @@ class GameSimulation:
             "power_percent": self.power.funding_percent,
             "power_charged": self.power.charged,
             "surge_active": self.surge_time_remaining > 0,
+            "active_phase": self.active_phase,
+            "active_phase_label": self.phase_label(self.active_phase),
+            "active_phase_badge": self.phase_badge(self.active_phase),
+            "highest_phase_reached": self.highest_phase_reached,
+            "highest_phase_reached_label": self.phase_label(self.highest_phase_reached),
+            "phase_transition": self.phase_transition_snapshot(),
             "level": self.level,
             "level_time_remaining": self.level_timer,
             "recent_harvest_event": self.latest_harvest_event_snapshot(),

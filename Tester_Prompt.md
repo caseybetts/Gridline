@@ -26,6 +26,10 @@ anchoring visuals, UX layout, or core mechanics assumptions to specific tuning v
 * **Understanding Agent Communication:** After reading this prompt document read the REPO_DOC_GUIDELINES.md in order to understand how to use the communication documents in this repo.
 *   **Pre-Action Audit:** Before testing, you **must** read the CURRENT_HANDOFFS.md file to check for any role specific actions.
 *   **Completion Handoff:** When testing is complete and another role should act next, write a concise message into that role's `Current Inbox` in `CURRENT_HANDOFFS.md`. Updating only the `User / Project Owner` section is not sufficient.
+*   **Lean Context Discipline:** After `REPO_DOC_GUIDELINES.md` and `CURRENT_HANDOFFS.md`, read only the minimum additional context needed to verify the active task. Prefer the exact bug, objective, files, tests, or sections named in the handoff.
+*   **Do Not Reopen Broad Docs By Default:** If the handoff already defines the target behavior and checks, do not reopen `game_summary.md`, `Game_Design.md`, `CODER_PROJECT_GUIDE.md`, or `agent_log.txt` unless you need scope intent, exact spec wording, engineering context, or chronology.
+*   **Targeted Reads Over Full Scans:** Prefer the specific test targets, QA entries, and cited sections over rereading large docs front to back.
+*   **Explicit Downstream Context:** When handing work to another agent, state exactly what they need to read next, what evidence already exists, and which broader docs they can skip unless needed.
 
 **Token Minimization**
 

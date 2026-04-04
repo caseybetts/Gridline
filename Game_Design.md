@@ -3,16 +3,16 @@
 ## Document Purpose
 
 This file is the primary design outline for `Gridline`.
-It is intended to translate planner-approved decisions into coder-usable feature specifications while `game_summary.md` remains the current source of truth unless the Planner promotes a newer decision here.
+It is intended to translate planner-approved decisions into coder-usable feature specifications while `game_summary.md` remains the planner-owned product vision and this file carries the implementation-ready gameplay rules.
 
 ## Usage Rules
 
 - Add new mechanics here before or alongside implementation.
 - Treat each major gameplay system as its own specification section.
 - Prefer explicit rules and edge cases over broad intent statements.
-- `game_summary.md` remains the current source of truth unless the Planner explicitly promotes a newer decision into this file.
+- Keep this document state-agnostic. Live priorities, active bugs, and sprint status belong in `CURRENT_HANDOFFS.md`, `QA_TRACKER.md`, or `agent_log.txt`, not here.
 
-## Current Product Summary
+## Product Summary
 
 - Genre: grid-based tower defense / corruption containment.
 - Platform: PC, windowed by default, fullscreen toggle supported.
@@ -1060,6 +1060,101 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 
 - Exact connectivity-count implementation details may vary by graph representation, but MVP target selection must follow the ordered priority rules above rather than any weighted scoring system.
 
+### 6A. Escalation Landmarks and Phase Signaling
+
+#### System Name & Goal
+
+- Goal: make endless survival read as an intentional sequence of early, mid, and late pressure phases so players and testers can tell where a run is succeeding or collapsing without relying only on raw survival time.
+
+#### Core Mechanics
+
+1. The run uses named escalation landmarks that sit above moment-to-moment spawn rolls and surge events.
+2. Landmark transitions are driven by existing approved pressure signals rather than by adding new enemy classes, new progression systems, or designer-only judgment at runtime.
+3. Each landmark transition updates both pacing parameters and player-facing presentation.
+4. Surges remain short pressure spikes inside the current landmark; they do not replace the larger run-phase identity.
+5. The current phase is always visible in the run-status stack and updates immediately when a transition occurs.
+
+#### Rules
+
+- MVP escalation landmarks are `Opening Containment`, `Escalation`, and `Critical Load`.
+- `Opening Containment` begins at run start and covers the opener-economy window where the player is establishing the first tower network and trying to reach the minute-two checkpoint.
+- `Escalation` begins once the opener gate is cleared or clearly missed and should represent the main role-separation and build-vs-mode-vs-funding decision window.
+- `Critical Load` begins once pressure is high enough that surge recovery, corruption management, and power-tower timing are expected live decisions. This landmark is about pressure state, not about whether the player already owns a stored charge.
+- Phase promotion is one-way only: `Opening Containment -> Escalation -> Critical Load`. The run never demotes to an earlier phase.
+- The first implementation pass must use the existing live metrics already approved elsewhere in the spec: `level`, `corruption_percent`, and `surge_active`.
+- `Opening Containment -> Escalation` occurs on the first update where either `level >= 4` or `corruption_percent >= 20`.
+- `Escalation -> Critical Load` occurs on the first update where either `level >= 9`, `corruption_percent >= 45`, or both `surge_active = true` and `corruption_percent >= 35`.
+- If the run jumps directly from `Opening Containment` to `Critical Load` because the critical trigger is met first, apply only the `Critical Load` transition feedback. Do not stack two banners back to back.
+- Each landmark transition must produce one short readable announcement in both the board-facing presentation and the command rail so the player can feel the phase shift instead of inferring it from hidden numbers.
+- Landmark labels should stay active after the transition; they are persistent run-state context, not one-off toast messages.
+- If the run extends beyond the intended target band, `Critical Load` persists and intensifies through existing pacing levers rather than inventing a fourth unapproved phase.
+- `highest_phase_reached` must update monotonically with the active phase and must never be cleared until a fresh run starts.
+
+#### Procedures
+
+1. Initialize `active_phase = Opening Containment` and `highest_phase_reached = Opening Containment` at the start of every fresh run.
+2. Evaluate the phase rules after the simulation update that changes `level`, `corruption_percent`, or `surge_active`, but before the next HUD refresh/render pass completes.
+3. Check the `Critical Load` trigger first, then the `Escalation` trigger, so a single sharp spike can promote the run directly to the correct highest phase.
+4. When a promotion occurs, update both `active_phase` and `highest_phase_reached` in the same step.
+5. Expose the new `active_phase` immediately in the command rail's persistent `Phase` row.
+6. Emit one board-facing transition banner for `1.2 s` anchored near the top-center of the playfield using the same typography family as the command rail.
+7. During that same `1.2 s` window, pulse the command-rail `Phase` row into its emphasized treatment instead of adding a second long-lived message block.
+8. On defeat, freeze the final `active_phase` and report `highest_phase_reached` in the defeat summary even if the loss occurs on the same update as a promotion.
+
+#### Boundaries and Edge Cases
+
+- If the player pauses or resizes during a transition window, the run must not lose or double-fire the landmark transition.
+- If corruption spikes sharply enough to jump a run into `Critical Load`, the UI must present one readable `Critical Load` transition rather than silently skipping feedback or replaying both missing phases.
+- If a run dies very early, the defeat shell should still report the highest landmark reached even if that is only `Opening Containment`.
+- Surges may overlap with landmark transitions, but the player must still be able to tell the difference between `phase changed` and `surge active`.
+- If pause opens while a phase-change banner is active, keep the persistent `Phase` row updated immediately; the transient banner may remain frozen and continue for its remaining time after resume, but it must not restart from full duration.
+- If defeat resolves while a phase-change banner is active, the defeat summary takes visual priority; do not try to render the lingering banner on top of the defeat shell.
+
+#### Outcomes
+
+- Endless runs feel authored instead of formless.
+- Testers can report whether a failure happened in the opener, the main build-vs-power decision window, or the late crisis instead of describing everything as generic balance drift.
+- Later balance work has clearer target windows because the product already communicates where the player is in the run arc.
+
+#### Data Requirements
+
+- `phase_id`
+- `phase_label = Opening Containment, Escalation, Critical Load`
+- `phase_transition_rules = opening_to_escalation(level >= 4 or corruption >= 20), escalation_to_critical(level >= 9 or corruption >= 45 or surge+corruption >= 35)`
+- `phase_transition_banner_duration = 1.2 s`
+- `phase_status_badge = OPENING, ESCALATION, CRITICAL`
+- `phase_pressure_profile`
+- `highest_phase_reached`
+- `phase_transition_feedback_profile = top-center board banner + command-rail phase-row pulse`
+
+#### State Machine / Flow
+
+- States: `opening_containment`, `escalation`, `critical_load`
+- Entry triggers: run start, threshold crossed
+- Exit triggers: next landmark reached, defeat
+
+#### UI / UX Requirements
+
+- The active phase must remain visible in the run-status stack as a dedicated persistent `Phase` row without pushing out core survival information.
+- Phase-change feedback should be noticeable, brief, and consistent with the command-console visual language rather than a disconnected arcade-style splash.
+- Surge alerts and phase labels must be visually distinguishable from one another at a glance.
+- Board-facing phase feedback for the first pass should be one slim top-center banner carrying the phase label plus a short descriptor:
+  - `Opening Containment`: `Establish the first defense line`
+  - `Escalation`: `Multi-front pressure rising`
+  - `Critical Load`: `Crisis management active`
+- The command rail must show one persistent `Phase` row using the compact badge plus full label, for example `Phase: OPENING | Opening Containment`.
+- During a transition pulse, emphasize only the `Phase` row and the board banner; do not shove other status rows downward or open a separate modal.
+- The defeat summary should report `highest_phase_reached`, not only the final instant phase, so playtest notes can anchor the run arc immediately.
+
+#### Implementation Notes for Coder
+
+- Keep phase rules data-driven and separate from the one-off visual treatment so tuning can change thresholds without rewriting the shell or HUD.
+- Use landmark logic to make pacing legible, not to hide balance problems behind presentation-only dressing.
+
+#### Open Questions
+
+- Later tuning may revise the exact thresholds, but the first implementation pass should use the concrete rules above rather than inventing a different transition mix.
+
 ### 7. Power Tower Event System
 
 #### System Name & Goal
@@ -1160,6 +1255,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 
 #### Rules
 
+- The board is the hero surface and the sidebar is the command rail; presentation should reinforce that hierarchy instead of competing with it.
 - Corruption percentage must always be visible.
 - Coin total must always be visible.
 - Active orb count and recent shots fired must be visible during MVP.
@@ -1170,7 +1266,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 - Build controls should appear only when an empty hardpoint is selected.
 - Tower-management controls should appear only when a tower is selected.
 - Power controls should be visually separated from both tower-build and tower-management controls.
-- `Esc` quits the run/application.
+- `Esc` toggles the pause shell while a run is active; quitting the application or abandoning the run should happen from the shell, not from the live contextual action stack.
 - Fullscreen toggle support is required.
 - In the first playable MVP build, active orb count and recent shots fired remain visible by default rather than being hidden behind a debug-only view.
 - Selecting an empty hardpoint must reset the contextual action region to the build group immediately so tower-build controls are reachable without blind scrolling.
@@ -1180,6 +1276,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 - Similar actions should be grouped under short section headers and should not repeat unnecessary nouns in every button label.
 - Tower-choice controls may use compact symbols or abbreviated labels only if the mapping remains obvious at a glance.
 - A deliberate multi-column action layout is allowed if that is the cleanest way to keep grouped controls visible and stationary within the approved sidebar space.
+- Shared presentation tokens such as panel framing, header treatment, status badges, and accent usage must stay consistent across the live HUD, pause shell, and defeat shell so the product reads as one authored interface family.
 
 #### Procedures
 
@@ -1188,6 +1285,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 - Change selected-panel contents immediately when the player changes selection.
 - Rebuild the contextual action region when selection changes so only relevant controls remain visible.
 - Keep the run-status area pinned while contextual controls below it may scroll or page if needed.
+- Preserve the command-rail scan order even when shell overlays open; pause and defeat surfaces may summarize or mute details, but they should not invent a contradictory information order.
 - On selecting an empty hardpoint, reset contextual action scroll or page state to the first build option.
 - On a real harvest-income award, emit the local harvest-result cue and any active tuning telemetry update in the same moment as the coin increase.
 - Prefer updating labels, enabled state, and highlight treatment in place rather than repacking controls into visibly shifting vertical positions whenever possible.
@@ -1216,6 +1314,8 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 - `shots_fired_recent`
 - `selected_tower_status`
 - `surge_state`
+- `run_state`
+- `phase_state`
 - `sidebar_sections = status, selected_object, contextual_actions, utility_menu`
 - `action_region_overflow_mode`
 - `context_action_scroll_reset_on_selection`
@@ -1234,6 +1334,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 - Selected-object details should sit in a dedicated panel beneath status.
 - Context-sensitive actions should live beneath details and swap cleanly between empty-hardpoint build actions and tower-management actions.
 - Utility/menu controls should sit in a quieter region separate from primary gameplay controls.
+- The board should remain visually dominant while the sidebar reads as a disciplined support surface rather than an equal-weight second canvas.
 - The layout should remain compact, technical, and visually grouped rather than reading as one long stack of equal-priority buttons.
 - Similar actions should read as grouped clusters first and individual buttons second.
 - Build buttons should prioritize tower identity over repeated verbs, for example a shared `Build` header with short tower-specific labels.
@@ -1241,6 +1342,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 - If one-column presentation cannot keep controls stationary and fully visible, a clean multi-column action region is preferred over a taller unstable single column.
 - Selecting an empty hardpoint should immediately surface the build choices without requiring the player to hunt for them below the fold.
 - Recent harvest gains should be legible as events, not only inferable from watching the total coin counter.
+- Live HUD, pause shell, and defeat shell should all look like the same command-console product through shared typography, panel language, and accent behavior.
 
 #### Implementation Notes for Coder
 
@@ -1272,7 +1374,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 - Color should not be the only carrier of important state; pair color with iconography, text, fill amount, pulse, or outline changes so volatile values still read clearly.
 - Relative threat communication should use thresholds derived from current live state, not hand-tuned art variants tied to one balance pass.
 - Recent-result feedback should prefer "what changed" cues such as gain pips, intensity step-downs, cooldown fill, and funding progress movement over raw number spam.
-- Run-status rows should keep a stable top-to-bottom order so scan memory survives tuning churn. The approved MVP order is: `Pressure`, `Corruption`, `Coins`, `Power`, `Level`, `Orb/shot telemetry`, `Recent harvest`, `Surge`, `Run state`.
+- Run-status rows should keep a stable top-to-bottom order so scan memory survives tuning churn. The approved MVP order is: `Pressure`, `Phase`, `Corruption`, `Coins`, `Power`, `Level`, `Orb/shot telemetry`, `Recent harvest`, `Surge`, `Run state`.
 - `Corruption` and `Power` should use text-plus-bar treatment together rather than bar-only or number-only treatment so both relative state and exact state remain readable across wide value ranges.
 - Relative readiness states should use compact named badges such as `STABLE`, `RISING`, `HIGH`, `CRITICAL`, `READY`, and `WAIT` instead of relying on raw numbers alone.
 - Unavailable actions should keep their normal action name visible and append a compact in-place reason such as `Need 55c`, `Blocked: power active`, `Select hardpoint`, or `Need stored charge`.
@@ -1357,6 +1459,177 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 
 - Whether the final shipped HUD keeps all temporary attribution cues or collapses some into subtler effects remains open after readability validation.
 
+### 8B. Supported-Window Layout and Playfield Framing Pass
+
+#### System Name & Goal
+
+- Goal: lock the remaining GUI follow-up into implementation-ready rules so the supported minimum window keeps core controls reachable and the board reads as a cleanly bounded playfield rather than an overextended canvas.
+
+#### Core Mechanics
+
+1. The sidebar must behave as a fixed control rail with pinned status and utility regions, while only the detail and action bodies are allowed to overflow internally.
+2. The minimum supported play window remains `1280 x 720`; at or above that size, core build, upgrade, mode, and power controls must stay visible or immediately reachable inside the structured action region.
+3. Selection-detail growth must never steal so much vertical space that the first actionable row for the current context disappears from the supported-window view.
+4. The rendered board boundary is the topology `playfield_rect` defined by the approved large-grid perimeter and hardpoint envelope.
+5. Space outside that playfield boundary may remain visible as background, but it must not read as additional playable grid space.
+
+#### Rules
+
+- The whole sidebar must not become one scrolling column. `Run Status` and `Menu` remain pinned; only the selection-detail body and contextual-action body may scroll internally if needed.
+- At the minimum supported window, the contextual action region must reserve enough visible height to show the active group header plus at least the first actionable row for the current selection type after any required selection-reset behavior.
+- Empty-hardpoint selection must still surface the `Build` group at the top of the action region.
+- Occupied-hardpoint selection must still surface the first `Tower Controls` row without requiring the player to scroll past the selection text block.
+- `Power` controls must remain visible in the structured action region or be reachable within the same action-region scroll context; they must not fall below a whole-sidebar fold created by growing detail text.
+- If selection text exceeds its visible budget, handle the overflow inside the selection region by wrap, truncation, or internal scroll before allowing the contextual-action region to lose its minimum visible footprint.
+- The supported-window solution should prefer denser grouped controls, shorter secondary text, and deliberate multi-column rows over increasing overall panel height.
+- The approved board boundary is the topology `playfield_rect`, not the full canvas width. Grid segments, intensity flashes, and other line-bound visuals must terminate at that boundary instead of implying extra columns on the right edge.
+- Hardpoints and temporary effects may visually overlap the board edge slightly for readability, but their anchors must remain on or inside the approved boundary so they do not read as extra board space.
+- If a board frame, vignette, or edge accent is added, it should reinforce where the playable field ends rather than decorate the empty canvas.
+- Behavior below the declared support floor may degrade gracefully, but any reproduction at or above `1280 x 720` remains a real usability or presentation bug.
+
+#### Procedures
+
+1. On startup, resize, or fullscreen toggle, compute the playfield boundary from topology and treat it as the authoritative rendered board extent.
+2. Allocate sidebar height in this priority order: title/status first, utility/menu last, then divide the remaining height between selection details and contextual actions while preserving the action-region visibility floor.
+3. When selection changes, rebuild only the relevant action contents inside stable group shells and reset the action-region position as needed for the newly selected context.
+4. If the selection block would exceed its height budget, keep the action region stable and resolve the extra detail length inside the selection block itself.
+5. During render, ensure line-based visuals are clipped or otherwise confined to the board boundary so the right edge terminates the same way the other sides do.
+6. Validate the layout in both default windowed mode and fullscreen, because right-edge drift may change when the canvas width changes.
+
+#### Boundaries and Edge Cases
+
+- If selection text, feedback text, and upgrade preview all become long at once, the action region still keeps its visibility floor; lower-priority detail text should compress first.
+- If a selected `Seed Tower` exposes the extra `Seed Levers` group, the first row of tower controls must still remain visible without losing the build-selection reset behavior on empty hardpoints.
+- If a future config adds more tower actions or longer reason text, preserve action identity and grouping first; do not solve the overflow by letting the entire sidebar slide off-screen.
+- If the canvas is wider than the approved board, the empty space to the right of the board should read as background, not as an extension of the grid.
+- If transient effects such as harvest popups, seed pulses, or power highlights approach the edge, they may bleed slightly for readability, but they must originate from in-bounds gameplay anchors.
+
+#### Outcomes
+
+- Supported laptop-sized windows keep the control panel usable without relying on a large display.
+- Players can build scan memory because selection-detail growth no longer shoves action groups out of view.
+- The board reads as a deliberately framed technical playfield with a consistent right edge instead of a stretched or accidentally expanded grid.
+
+#### Data Requirements
+
+- `minimum_supported_window = 1280 x 720`
+- `pinned_sidebar_regions = title, run_status, utility_menu`
+- `selection_region_overflow_mode`
+- `selection_region_height_budget`
+- `contextual_action_visibility_floor`
+- `active_group_first_row_visibility`
+- `supported_window_validation_cases = empty hardpoint, occupied basic tower, occupied seed tower, active power state`
+- `board_boundary_rect = topology.playfield_rect`
+- `board_boundary_visual_treatment`
+- `line_visual_clip_policy`
+
+#### State Machine / Flow
+
+- States: `supported_window_layout`, `selection_overflow_managed`, `action_floor_preserved`, `board_framed`, `board_resize_recomputed`, `below_support_floor_best_effort`
+- Entry triggers: boot, resize, fullscreen toggle, selection change, overflow detected
+- Exit triggers: layout recomputed, overflow resolved, deselection, shutdown
+
+#### UI / UX Requirements
+
+- The sidebar must continue to feel like one deliberate control panel, but its internal overflow handling should be invisible to the player during normal use.
+- The first actionable controls for the current selection should appear predictably in the same visual area at the support floor.
+- Multi-column action rows are preferred whenever they preserve readability and supported-window reachability better than a taller single-column stack.
+- The selection section may be information-dense, but it should not dominate the sidebar at the expense of action access.
+- The board edge should look intentional and symmetrical; the right side must terminate with the same visual confidence as the left, top, and bottom.
+
+#### Implementation Notes for Coder
+
+- Treat `BUG-021` and `BUG-020` as one layout/framing pass: solve sidebar reachability and board-boundary presentation together so resize behavior is validated once.
+- Add targeted regression coverage for supported-window action reachability and right-edge board termination in both default windowed mode and fullscreen where practical.
+- Favor layout budgeting and explicit board-boundary rendering rules over one-off pixel nudges.
+
+#### Open Questions
+
+- Whether the final board frame should use a subtle outline, a darker margin treatment, or no extra frame beyond clean line termination remains open as long as the boundary reads clearly.
+
+### 8C. Run-State Shell and Session Flow
+
+#### System Name & Goal
+
+- Goal: define the lightweight product shell around the live simulation so `Gridline` launches, pauses, ends, and replays like a coherent game instead of a raw always-live sandbox.
+
+#### Core Mechanics
+
+1. The product opens into a lightweight title/ready shell before the first run starts.
+2. The active run can be paused without destroying board context, current selection, or the player's mental model of the current crisis.
+3. Defeat transitions into a summary shell that explains why the run ended and what the player can do next.
+4. Immediate replay starts a fresh run from the same approved config set without forcing the player through a deep menu stack.
+5. Shell screens and overlays reuse the same command-surface visual language as the live HUD.
+
+#### Rules
+
+- MVP shell states are `title_ready`, `active_run`, `paused`, and `defeat_summary`.
+- The game must not boot directly into an unframed live run with no start-state context.
+- `Esc` from `active_run` opens `paused`; `Esc` from `paused` returns to `active_run`.
+- The `paused` shell freezes simulation time, enemy movement, tower cooldown progression, spread cadence, and power-duration countdowns until play resumes.
+- The `paused` shell must preserve the underlying board image and the current selection state so the player resumes exactly where they left off.
+- The `defeat_summary` shell appears automatically when the loss condition resolves and replaces pause controls with post-run summary plus next actions.
+- `Replay` must be the primary post-defeat action and should start a fresh run immediately from the same config without extra confirmation unless the Planner later adds a destructive-profile concern.
+- `Quit` and other low-frequency session actions belong to shell surfaces such as `title_ready`, `paused`, or `defeat_summary`; they do not belong in the main contextual action stack.
+- MVP shell scope is intentionally lean: no save system, no metaprogression, no branching campaign menus, and no settings labyrinth beyond the required display/session actions.
+
+#### Procedures
+
+1. On boot, enter `title_ready` with the board visible as background or preview context plus a primary `Start Run` action.
+2. On `Start Run`, initialize a fresh simulation state, clear prior selection and feedback remnants, and enter `active_run`.
+3. On `Esc` during `active_run`, freeze simulation updates, preserve current selection/UI context, and open the `paused` shell.
+4. On `Resume`, close the pause shell and return to `active_run` with the preserved selection and context intact.
+5. On loss, finish the resolving simulation step, snapshot summary data, and transition into `defeat_summary`.
+6. On `Replay`, rebuild the run from a fresh state using the current approved config and return to `active_run`.
+
+#### Boundaries and Edge Cases
+
+- If the player pauses during a surge, during an active power window, or while corruption is near the threshold, the shell must preserve those states exactly rather than normalizing them for presentation.
+- If defeat occurs during a paused-adjacent input window, defeat takes precedence and the product transitions to `defeat_summary` instead of back to `paused`.
+- If the player toggles fullscreen or resizes from a shell state, the shell and board must recompute layout without losing the current run-state identity.
+- If a transient event message is active when pause opens, it may be visually muted by the shell, but it must not corrupt or reorder the underlying run state when play resumes.
+
+#### Outcomes
+
+- The game reads as a finished session-based product rather than a tool-like simulation window.
+- Players can stop, inspect, lose, and restart runs without confusion or abrupt app-level exits.
+- Playtest notes can distinguish shell friction from balance friction because the start, pause, and defeat flows are explicitly defined.
+
+#### Data Requirements
+
+- `run_state = title_ready, active_run, paused, defeat_summary`
+- `shell_primary_actions = start_run, resume, replay, fullscreen_toggle, quit`
+- `shell_focus_default`
+- `pause_preserves_selection = true`
+- `pause_freezes_simulation = true`
+- `defeat_summary_fields = run_duration, cause_of_loss, highest_phase_reached, corruption_percent_at_loss, highest_power_funding, power_deploy_count`
+- `shell_transition_duration`
+- `shell_background_treatment`
+
+#### State Machine / Flow
+
+- States: `title_ready`, `active_run`, `paused`, `defeat_summary`
+- Entry triggers: boot, start input, `Esc`, loss resolution, replay input
+- Exit triggers: start input, resume input, replay input, quit input, shutdown
+
+#### UI / UX Requirements
+
+- The title/ready shell should establish the game's command-console tone quickly without becoming a separate feature-heavy front end.
+- The pause shell should foreground the immediate decision to resume, restart, or quit while leaving the frozen board visible enough that the player retains situational context.
+- The defeat shell must explain the loss in the same visual language as the live HUD and should emphasize the next action rather than trapping the player in a static summary page.
+- Summary emphasis order should be: `Cause of loss`, `Run duration`, `Highest phase reached`, `Corruption at loss`, `Power usage`, then optional secondary stats.
+- Shell typography, headers, badges, and accent colors should reuse the same visual system as the command rail so the transition between live play and overlays feels intentional and continuous.
+
+#### Implementation Notes for Coder
+
+- Separate shell state from simulation state so pause and defeat do not require ad hoc gameplay exceptions inside the sim loop.
+- Treat replay as a full state reset, not a partial cleanup of the previous run.
+- Use the shell to solve session clarity first; do not backfill shell behavior later through one-off keybind hacks.
+
+#### Open Questions
+
+- Whether the title/ready shell uses a static background board, a low-motion live preview, or a frozen sample board remains open as long as it stays visually lightweight.
+
 ## Known Inputs Already Agreed
 
 - Towers use predefined edge hardpoints rather than free placement.
@@ -1377,6 +1650,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 - If red and green contest the same line at the same time, the current line color remains unchanged.
 - Green and red intensity should both read from lighter to darker as level increases.
 - Corrupter-focused surges are in MVP; bosses are not.
+- Endless escalation must present named landmarks for `Opening Containment`, `Escalation`, and `Critical Load`.
 - MVP enemy roster starts with `Corruption Seeder` and `Tower Striker`.
 - Orb cleaning is continuous by distance traveled.
 - Corruption-capable enemies telegraph impending seeding by shifting from lighter red toward darker red and may pulse on release.
@@ -1385,6 +1659,8 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 - `hp` applies to both towers and enemies.
 - Power tower funding is paid in 10 percent increments and stores one charge at a time.
 - Power tower can be deployed onto any hardpoint, including one already occupied by a tower, and restores the prior tower behavior when it expires.
+- The product shell includes `title_ready`, `active_run`, `paused`, and `defeat_summary` states.
+- `Esc` opens pause during active play and resumes from pause; quitting belongs to shell surfaces rather than the live action stack.
 - Each archetype has one fixed secondary behavior option for MVP.
 - `Basic Tower -> Guard Mode`, `Seed Tower -> Recall Mode`, `Burst Tower -> Focus Mode`.
 - Behavior switching is manual and cooldown-gated.
@@ -1854,40 +2130,30 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 
 - Goal: turn the first stable MVP build into a playtest-ready build by tuning pacing, economy pressure, tower-role clarity, secondary-mode tradeoffs, power-tower usage, and high-value readability/usability polish without adding new major systems.
 
-#### Current Batch Priority
-
-- Active batch: extend competent runs into longer sessions while preserving power-tower emergency identity and judging role separation.
-- Active gating issues: `OBJ-013` and `OBJ-014` in `QA_TRACKER.md`.
-- Reopened lane status: power reachability is now proven in competent lines, so the remaining blocker is broader run length and longer-session evaluation.
-- Current failure evidence: competent sampled runs still end around `120.03` to `144.03` seconds in most cases, with one observed `240.03` second cap; power funding can now reach `100%` with at least one real deploy before loss.
-- Explicit defers for this batch: no green-seeding ally, no default medium-grid seed travel for `Seed Tower`, and no seed-launch-path presentation work unless it becomes a clear active blocker.
-- Immediate success gate for the next pass: extend competent runs beyond early-mid collapse windows so longer-session role separation, late-use system value, and pacing can be judged (targeting the 10 to 15 minute band without power-rush dominance).
-
 #### Core Mechanics
 
 1. Treat the MVP starter constants as the baseline and modify only existing values, timings, thresholds, targeting weights, UI grouping, label clarity, and feedback strength during this pass.
-2. The current sub-batch focuses on extending competent runs from the present early-to-mid range into a window where power funding, charging, and deployment become real strategic decisions.
-3. Secondary modes are now part of active evaluation again, but practical power-tower reachability and broader run-length extension are the first priorities inside that reopened lane.
-4. The allowed levers for this batch are existing pacing, economy, and power-funding parameters rather than new mechanics or new content classes.
-5. Once power-tower reachability is proven in competent runs, resume the broader Section 20 evaluation across longer-run role separation, mode tradeoffs, and later usability follow-up.
-6. Defer any problem that appears to require a new mechanic, new content class, or structural expansion back to Planner instead of growing scope inside this pass.
+2. Focus this pass on pacing, economy pressure, role separation, secondary-mode tradeoffs, power-tower timing/value, and readability/usability polish.
+3. The allowed levers for this pass are existing pacing, economy, power-funding, targeting, and presentation parameters rather than new mechanics or new content classes.
+4. Defer any problem that appears to require a new mechanic, new content class, or structural expansion back to Planner instead of growing scope inside this pass.
+5. Practical power-tower reachability, meaningful mode tradeoffs, and longer-session role judgment should all be possible before the pass is considered complete.
 
 #### Rules
 
 - No new enemy classes, bosses, tower archetypes, progression layers, currencies, or meta systems may be added in this pass.
+- Broader balance-first test cycles should not take priority over missing run-state shell work, escalation-landmark signaling, or command-surface readability work already approved elsewhere in this document.
 - Do not flatten archetype identity just to hit survival-time targets; role separation is a required outcome, not optional polish.
 - Prefer incremental tuning passes over broad multi-system rewrites so playtest results remain attributable.
 - Readability/usability work is in scope only when it materially improves decision speed, feedback clarity, or control reachability during live play.
 - If a tuning change would alter the game's core fantasy or loop, stop and escalate to Planner.
-- Use the recorded `BUG-014` live-play evidence as the active baseline for this batch rather than reopening older opener-collapse assumptions.
-- The next coder pass must focus on existing-system levers that affect practical power reachability and broader run extension: harvest income, build and upgrade costs, shot costs, spawn/corruption pacing, power-funding chunk cost, and other current power-funding timing/value levers already present in the approved systems.
+- Tuning passes should focus on existing-system levers that affect practical power reachability and broader run extension: harvest income, build and upgrade costs, shot costs, spawn/corruption pacing, power-funding chunk cost, and other current power-funding timing/value levers already present in the approved systems.
 - A competent mixed or power-leaning line should be able to reach at least one meaningful charge or deploy decision before loss; if power never reaches 100 percent, the batch has not met its primary goal.
 - If a new best line becomes rushing power funding so hard that permanent tower development stops mattering, the power tower has become overtuned.
 - If runs extend slightly but still never reach a realistic charge or deploy point, the batch is incomplete even if secondary modes remain reachable.
-- Explicitly defer a green-seeding ally, default medium-grid `Seed Tower` travel, and non-blocking seed-launch-path presentation changes during this batch.
+- Explicitly defer a green-seeding ally, default medium-grid `Seed Tower` travel, and non-blocking seed-launch-path presentation changes unless Planner reopens scope.
 - In informed non-throw play, most losses should land inside the 10 to 15 minute target band.
 - Repeated losses before minute 5 indicate the opener is too punishing unless the player is obviously leaving hardpoints idle or refusing affordable actions.
-- Repeated sub-minute losses remain unacceptable, but they are no longer the active blocker for this batch.
+- Repeated sub-minute losses remain unacceptable.
 - Repeated survival past minute 18 with stable board control indicates pressure and/or economy tension is too soft.
 - By minute 2, the player should usually be able to afford either a second tower or a meaningful first upgrade without being forced into one rigid scripted opener.
 - One early experiment such as an early upgrade, behavior purchase, or suboptimal first tower should reduce efficiency but should not by itself create an unrecoverable death spiral.
@@ -1905,13 +2171,12 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 
 #### Procedures
 
-1. Reproduce the current `BUG-014` evidence against the known competent styles: secondary-first, mixed-then-power, and direct power-rush.
+1. Evaluate competent styles such as secondary-first, mixed-then-power, and direct power-rush.
 2. For each session, record at minimum: `run_duration`, `cause_of_loss`, `first_secondary_activation_time`, `first_power_funding_purchase_time`, `highest_power_funding_reached`, `charge_stored`, and `power_deploy_count`.
-3. Treat the first pass as successful only if competent runs can now reach at least one meaningful power charge or deploy decision while extending beyond the current `128.03` to `160.03` second window.
-4. Adjust the smallest allowed existing-system lever first: current economy values, current pacing/pressure timings, or current power-funding values.
-5. Re-run the same power-reachability lines after each tuning batch before reopening any deferred raw-note ideas.
-6. Only after power becomes practically reachable should later metrics such as final late-run role separation, new readability polish questions, or broader conceptual follow-ups return to primary evaluation status.
-7. If a fix only works by proposing new mechanics or content classes, defer it back to Planner instead of implementing around the gap.
+3. Treat a tuning pass as successful only if competent runs can reach at least one meaningful power charge or deploy decision while entering a longer decision window for role separation and late-use judgment.
+4. Adjust the smallest allowed existing-system lever first: economy values, pacing/pressure timings, or power-funding values.
+5. Re-run the same power-reachability and role-separation lines after each tuning batch before reopening deferred scope ideas.
+6. If a fix only works by proposing new mechanics or content classes, defer it back to Planner instead of implementing around the gap.
 
 #### Boundaries and Edge Cases
 
@@ -1920,7 +2185,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 - If economy forgiveness causes shot cost or build order to stop mattering by mid-run, restore pressure before adding more generosity.
 - If a build survives longer only because it front-loads one clearly dominant power-rush path, keep tuning until there is real early decision space again.
 - If a run can technically charge power only by abandoning basic expansion and then dies before deployment can matter, power reachability is still failing in practice.
-- If one of the explicitly deferred raw-note ideas appears attractive as a shortcut fix, do not implement it in this batch without a new planner decision.
+- If one of the explicitly deferred scope ideas appears attractive as a shortcut fix, do not implement it without a new planner decision.
 - If a sidebar or label change fixes a usability problem without touching balance, prefer that narrower change over rebalance.
 - If an issue appears only at small windows or only under dense control sets, treat it as a real usability defect rather than an optional edge polish item.
 
@@ -1928,13 +2193,11 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 
 - The build should be ready for longer-form playtesting with clearer pacing expectations and fewer ambiguous balance reads.
 - Players should be able to explain why they built a given tower, why they switched modes, and why they deployed or saved the power tower.
+- Players and testers should be able to identify the current run phase and the current shell state without guesswork before deeper balance conclusions are trusted.
 - Post-run notes should reveal whether a failure came from bad decisions, weak tuning, or unclear feedback instead of mixing all three together.
 
 #### Data Requirements
 
-- `observed_power_reachability_run_window = 120.03 to 240.03 seconds`
-- `observed_power_funding_ceiling = 100 percent`
-- `power_reachability_priority = cleared (run-length extension now primary)`
 - `target_run_duration_low = 10 minutes`
 - `target_run_duration_high = 15 minutes`
 - `power_charge_reachability_gate = at least one meaningful charge or deploy decision should become reachable in competent runs`
@@ -1946,14 +2209,8 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 - `power_tower_target_role = emergency stabilizer`
 - `deferred_scope_items = green-seeding ally, default medium-grid seed travel, non-blocking seed-launch-path presentation`
 - `minimum_ui_support_window = 1280 x 720`
-- `required_readability_checks = red/green intensity readability, visible orb impact step, enemy seeding telegraph clarity, explicit active mode naming, contextual control reachability`
-- `playtest_session_notes = run_duration, cause_of_loss, build/upgrade timing, mode usage, power usage, readability/usability pain points`
-
-#### State Machine / Flow
-
-- States: `baseline_locked`, `playtest_batch_running`, `issue_cluster_identified`, `tuning_batch_in_progress`, `revalidation_running`, `accepted_for_next_build`, `deferred_to_planner`
-- Entry triggers: planner milestone change, new tuning batch, post-batch findings, blocked scope
-- Exit triggers: tuning acceptance, finding disproved, issue deferred to Planner, next tuning cycle begins
+- `required_readability_checks = red/green intensity readability, visible orb impact step, enemy seeding telegraph clarity, explicit active mode naming, contextual control reachability, active phase readability, run-state shell clarity`
+- `playtest_session_notes = run_duration, cause_of_loss, phase_reached, build/upgrade timing, mode usage, power usage, readability/usability pain points`
 
 #### UI / UX Requirements
 
@@ -1961,30 +2218,10 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 - Active tower behavior must always use explicit mode names such as `Guard Mode`, `Recall Mode`, and `Focus Mode`.
 - Run-critical status must stay visible while contextual controls change underneath it.
 - Context-sensitive actions must stay reachable under tall control sets and constrained window sizes.
+- The player must always be able to tell whether the product is in `active_run`, `paused`, or `defeat_summary`, and what escalation phase the run has reached.
 - Readability polish in this pass should focus on decision-relevant signals: line intensity, orb impact, enemy telegraphs, cooldown/readiness state, and power funding/deployment state.
-
-#### Implementation Notes for Coder
-
-- For the current batch, override the broader priority order and treat practical power-tower reachability plus broader early-to-mid run extension as the first pass.
-- Focus on existing-system pacing, economy, and power-funding levers before touching any deferred scope-expanding concepts or smoothing-only polish.
-- Secondary modes are reachable again; use that reopened state to judge whether power ever becomes a real decision, not to justify unrelated new mechanics.
-- After power charging and deployment become realistically reachable in competent runs, resume the broader Section 20 priority order.
-- Keep changes within existing systems unless the Planner explicitly reopens scope.
-- Preserve or expose enough runtime information to support the listed playtest notes; do not hide active mode names, readiness states, or power charge state during this pass.
-
-#### Open Questions
-
-- Exact numeric overrides from the MVP starter constants remain open until the current power-reachability batch produces evidence.
-- Whether practical power viability is best restored through economy relief, slower early-mid pressure growth, cheaper funding, or a mix remains open pending measured playtest results.
-
-## Immediate Next Design Work
-
-- Prioritize coder work on config-agnostic visuals, HUD readability, and contextual-control robustness using the rules in `8. HUD, Telemetry, and Player Feedback` and `8A. Config-Agnostic Visual Readability and UX Robustness Pass`.
-- Focus on improvements that remain correct across wide gameplay-config changes: value-length tolerance, action-state clarity, feedback timing, and overflow-safe sidebar behavior.
-- Continue to defer a green-seeding ally, default medium-grid `Seed Tower` travel, and non-blocking seed-launch-path presentation changes until a later planner-approved phase.
-- Avoid balance-anchored visual assumptions while gameplay configs remain user-owned and volatile.
 
 ## Approved MVP Defaults
 
 - The MVP Starter Constants in this document are the approved default implementation target for the first playable build.
-- The Coder should implement these defaults directly unless a newer Planner entry overrides them.
+- The Coder should implement these defaults directly unless the planner-owned source-of-truth docs change.

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gc
 from dataclasses import replace
 import re
 import tkinter as tk
@@ -140,14 +141,55 @@ def enemy_render_color(app: "GridlineApp", enemy) -> str:
     return blend_hex(app.spec.visuals.red_levels[2], app.spec.visuals.red_levels[0], progress)
 
 
+_APP_HOST_ROOT: tk.Tk | None = None
+
+
+def _host_root_alive(root: tk.Tk | None) -> bool:
+    if root is None:
+        return False
+    try:
+        return bool(root.winfo_exists())
+    except tk.TclError:
+        return False
+
+
+def _acquire_app_root() -> tk.Tk:
+    global _APP_HOST_ROOT
+    if not _host_root_alive(_APP_HOST_ROOT):
+        _APP_HOST_ROOT = tk.Tk()
+        return _APP_HOST_ROOT
+    try:
+        for child in _APP_HOST_ROOT.winfo_children():
+            child.destroy()
+    except tk.TclError:
+        pass
+    try:
+        _APP_HOST_ROOT.attributes("-fullscreen", False)
+    except tk.TclError:
+        pass
+    try:
+        _APP_HOST_ROOT.deiconify()
+    except tk.TclError:
+        pass
+    return _APP_HOST_ROOT
+
+
 class GridlineApp:
     def __init__(self, spec: GameSpec | None = None) -> None:
         self.spec = spec or load_game_spec()
-        self.root = tk.Tk()
+        self.root = _acquire_app_root()
         self.root.title("Gridline MVP")
         self.root.geometry(f"{self.spec.width}x{self.spec.height}")
         self.root.configure(bg=self.spec.visuals.background)
+        self.root.protocol("WM_DELETE_WINDOW", self._quit_app)
+        self.root.bind("<Destroy>", self._on_root_destroy, add="+")
         self.fullscreen = False
+        self.rail_panel_bg = "#0E1824"
+        self.rail_panel_alt_bg = "#101D2B"
+        self.rail_panel_quiet_bg = "#0A1320"
+        self.rail_panel_border = "#203447"
+        self.rail_panel_border_strong = "#2F4F6B"
+        self.rail_emphasis_bg = "#13283A"
 
         self.main_frame = tk.Frame(self.root, bg=self.spec.visuals.background)
         self.main_frame.pack(fill=tk.BOTH, expand=True)
@@ -163,24 +205,43 @@ class GridlineApp:
         self.sidebar.pack(side=tk.RIGHT, fill=tk.Y)
         self.sidebar.pack_propagate(False)
 
-        self.status_text = tk.StringVar()
-        self.detail_text = tk.StringVar()
-        self.feedback_text = tk.StringVar()
-        self.upgrade_text = tk.StringVar()
+        self.status_text = tk.StringVar(master=self.root)
+        self.detail_text = tk.StringVar(master=self.root)
+        self.feedback_text = tk.StringVar(master=self.root)
+        self.upgrade_text = tk.StringVar(master=self.root)
+        self.utility_hint_text = tk.StringVar(master=self.root)
+        self.status_row_vars: dict[str, tk.StringVar] = {}
+        self.status_row_labels: dict[str, tk.Label] = {}
+        self.status_row_order = ("pressure", "phase", "corruption", "coins", "power", "level", "telemetry", "harvest", "surge", "status")
         self.action_buttons: dict[str, tk.Button] = {}
         self.utility_buttons: dict[str, tk.Button] = {}
         self.action_groups: dict[str, tk.Frame] = {}
         self.action_group_headers: dict[str, tk.Label] = {}
         self.action_group_keys: dict[str, list[str]] = {}
         self._last_action_selection_signature: tuple[str | None, str] | None = None
+        self._last_detail_selection_signature: tuple[str | None, str] | None = None
+        self._sidebar_rebalance_after_id: str | None = None
+        self._action_scroll_reset_after_id: str | None = None
+        self._detail_scroll_reset_after_id: str | None = None
+        self._loop_after_id: str | None = None
         self._build_sidebar()
         self.canvas.bind("<Button-1>", self._on_canvas_click)
-        self.root.bind("<Escape>", lambda _event: self.root.destroy())
+        self.root.bind("<Escape>", self._on_escape)
         self.root.bind("<F11>", self._toggle_fullscreen)
         self.tick_ms = int(1000 / self.spec.simulation_tick_rate)
+        self.sim_dt = 1.0 / self.spec.simulation_tick_rate
+        self.sidebar_refresh_interval = 1.0 / max(1, self.spec.hud_refresh_rate)
+        self.sidebar_refresh_elapsed = self.sidebar_refresh_interval
         self.loop_running = False
         self.root.update_idletasks()
         self.sim = GameSimulation(self._runtime_spec_for_canvas())
+        self.shell_state = "title_ready"
+        self.highest_power_funding = self.sim.power.funding_percent
+        self.power_deploy_count = 0
+        self.defeat_summary: dict[str, object] = {}
+        self._queue_sidebar_rebalance()
+        self._render()
+        self._refresh_sidebar()
 
     def _build_sidebar(self) -> None:
         label_style = {
@@ -189,52 +250,83 @@ class GridlineApp:
             "anchor": "w",
             "justify": "left",
         }
-        tk.Label(self.sidebar, text="Gridline", font=("Consolas", 18, "bold"), **label_style).pack(fill=tk.X, padx=16, pady=(16, 8))
+        self.sidebar.bind("<Configure>", self._on_sidebar_configure)
+        self.title_label = tk.Label(self.sidebar, text="Gridline", font=("Consolas", 18, "bold"), **label_style)
+        self.title_label.pack(fill=tk.X, padx=16, pady=(16, 8))
 
-        status_frame = tk.Frame(self.sidebar, bg=self.spec.visuals.sidebar)
-        status_frame.pack(fill=tk.X, padx=16, pady=(0, 8))
-        self._section_label(status_frame, "Run Status").pack(fill=tk.X, pady=(0, 4))
-        tk.Label(status_frame, textvariable=self.status_text, font=("Consolas", 11), **label_style).pack(fill=tk.X)
+        self.status_frame, status_body = self._build_section_shell(self.sidebar, "Run Status", self.rail_panel_bg, self.rail_panel_border_strong)
+        self.status_frame.pack(fill=tk.X, padx=16, pady=(0, 8))
+        for key in self.status_row_order:
+            var = tk.StringVar(master=self.root)
+            label = tk.Label(
+                status_body,
+                textvariable=var,
+                font=("Consolas", 10, "bold" if key in {"pressure", "phase", "corruption", "power"} else "normal"),
+                bg=self.rail_emphasis_bg if key in {"pressure", "phase", "corruption", "power"} else self.rail_panel_bg,
+                fg=self.spec.visuals.text if key in {"pressure", "phase", "corruption", "power"} else self.spec.visuals.muted_text,
+                anchor="w",
+                justify="left",
+                padx=8,
+                pady=4,
+            )
+            label.pack(fill=tk.X, pady=(0, 2))
+            self.status_row_vars[key] = var
+            self.status_row_labels[key] = label
 
-        details_frame = tk.Frame(self.sidebar, bg=self.spec.visuals.sidebar)
-        details_frame.pack(fill=tk.X, padx=16, pady=(0, 8))
-        details_frame.pack_propagate(False)
-        details_frame.configure(height=240)
-        self._section_label(details_frame, "Selection").pack(fill=tk.X, pady=(0, 4))
+        self.details_frame, detail_body_shell = self._build_section_shell(self.sidebar, "Selection", self.rail_panel_alt_bg, self.rail_panel_border)
+        self.details_frame.pack(fill=tk.X, padx=16, pady=(0, 8))
+        self.details_frame.pack_propagate(False)
+        self.details_frame.configure(height=220)
+        self.detail_body = tk.Frame(detail_body_shell, bg=self.rail_panel_alt_bg)
+        self.detail_body.pack(fill=tk.BOTH, expand=True)
+        self.detail_canvas = tk.Canvas(self.detail_body, bg=self.rail_panel_alt_bg, highlightthickness=0, bd=0)
+        self.detail_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.detail_scrollbar = tk.Scrollbar(self.detail_body, orient=tk.VERTICAL, command=self.detail_canvas.yview)
+        self.detail_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.detail_canvas.configure(yscrollcommand=self.detail_scrollbar.set)
+        self.detail_inner = tk.Frame(self.detail_canvas, bg=self.rail_panel_alt_bg)
+        self.detail_canvas_window = self.detail_canvas.create_window((0, 0), window=self.detail_inner, anchor="nw")
+        self.detail_inner.bind("<Configure>", self._sync_detail_scrollregion)
+        self.detail_canvas.bind("<Configure>", self._sync_detail_canvas_width)
         tk.Label(
-            details_frame,
+            self.detail_inner,
             textvariable=self.detail_text,
             font=("Consolas", 10),
             wraplength=self.spec.visuals.sidebar_width - 32,
-            **label_style,
+            bg=self.rail_panel_alt_bg,
+            fg=self.spec.visuals.text,
+            anchor="w",
+            justify="left",
         ).pack(fill=tk.X)
         tk.Label(
-            details_frame,
+            self.detail_inner,
             textvariable=self.feedback_text,
             font=("Consolas", 10),
             wraplength=self.spec.visuals.sidebar_width - 32,
             fg="#F2C46D",
-            bg=self.spec.visuals.sidebar,
+            bg=self.rail_panel_alt_bg,
             anchor="w",
             justify="left",
         ).pack(fill=tk.X, pady=(6, 0))
         tk.Label(
-            details_frame,
+            self.detail_inner,
             textvariable=self.upgrade_text,
             font=("Consolas", 9),
             wraplength=self.spec.visuals.sidebar_width - 32,
-            **label_style,
+            bg=self.rail_panel_alt_bg,
+            fg=self.spec.visuals.muted_text,
+            anchor="w",
+            justify="left",
         ).pack(fill=tk.X, pady=(6, 0))
 
-        actions_shell = tk.Frame(self.sidebar, bg=self.spec.visuals.sidebar)
-        actions_shell.pack(fill=tk.BOTH, expand=True, padx=16, pady=(0, 8))
-        self._section_label(actions_shell, "Actions").pack(fill=tk.X, pady=(0, 4))
-        self.action_canvas = tk.Canvas(actions_shell, bg=self.spec.visuals.sidebar, highlightthickness=0, bd=0)
+        self.actions_shell, action_body_shell = self._build_section_shell(self.sidebar, "Actions", self.rail_panel_bg, self.rail_panel_border)
+        self.actions_shell.pack(fill=tk.BOTH, expand=True, padx=16, pady=(0, 8))
+        self.action_canvas = tk.Canvas(action_body_shell, bg=self.rail_panel_bg, highlightthickness=0, bd=0)
         self.action_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.action_scrollbar = tk.Scrollbar(actions_shell, orient=tk.VERTICAL, command=self.action_canvas.yview)
+        self.action_scrollbar = tk.Scrollbar(action_body_shell, orient=tk.VERTICAL, command=self.action_canvas.yview)
         self.action_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.action_canvas.configure(yscrollcommand=self.action_scrollbar.set)
-        self.action_inner = tk.Frame(self.action_canvas, bg=self.spec.visuals.sidebar)
+        self.action_inner = tk.Frame(self.action_canvas, bg=self.rail_panel_bg)
         self.action_canvas_window = self.action_canvas.create_window((0, 0), window=self.action_inner, anchor="nw")
         self.action_inner.bind("<Configure>", self._sync_action_scrollregion)
         self.action_canvas.bind("<Configure>", self._sync_action_canvas_width)
@@ -287,12 +379,23 @@ class GridlineApp:
             columns=2,
         )
 
-        utility_frame = tk.Frame(self.sidebar, bg=self.spec.visuals.sidebar)
-        utility_frame.pack(fill=tk.X, padx=16, pady=(0, 16))
-        self._section_label(utility_frame, "Menu").pack(fill=tk.X, pady=(0, 4))
-        new_game_button = self._make_button(utility_frame, "new_game", "New Game", self._new_game)
-        new_game_button.pack(fill=tk.X, pady=3)
-        self.utility_buttons["new_game"] = new_game_button
+        self.utility_frame, utility_body = self._build_section_shell(self.sidebar, "Utility", self.rail_panel_quiet_bg, self.rail_panel_border)
+        self.utility_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=16, pady=(0, 16))
+        self.utility_note_label = tk.Label(
+            utility_body,
+            textvariable=self.utility_hint_text,
+            font=("Consolas", 9),
+            bg=self.rail_panel_quiet_bg,
+            fg=self.spec.visuals.muted_text,
+            anchor="w",
+            justify="left",
+            wraplength=self.spec.visuals.sidebar_width - 48,
+        )
+        self.utility_note_label.pack(fill=tk.X, pady=(0, 4))
+        self.utility_buttons["start_run"] = self._make_shell_button(utility_body, "Start Run", self._start_run)
+        self.utility_buttons["resume"] = self._make_shell_button(utility_body, "Resume", self._resume_run)
+        self.utility_buttons["replay"] = self._make_shell_button(utility_body, "Replay", self._replay_run)
+        self.utility_buttons["quit"] = self._make_shell_button(utility_body, "Quit", self._quit_app)
 
     def _run_action(self, key: str, command) -> None:
         availability = self.sim.action_availability()
@@ -307,10 +410,16 @@ class GridlineApp:
         self._refresh_sidebar()
 
     def _build_action_group(self, group_key: str, title: str, actions: list[tuple[str, str, object]], columns: int = 1) -> None:
-        group_frame = tk.Frame(self.action_inner, bg=self.spec.visuals.sidebar)
+        group_frame = tk.Frame(
+            self.action_inner,
+            bg=self.rail_panel_alt_bg,
+            highlightbackground=self.rail_panel_border,
+            highlightthickness=1,
+            bd=0,
+        )
         header = self._section_label(group_frame, title)
-        header.pack(fill=tk.X, pady=(0, 4))
-        button_shell = tk.Frame(group_frame, bg=self.spec.visuals.sidebar)
+        header.pack(fill=tk.X, padx=8, pady=(8, 4))
+        button_shell = tk.Frame(group_frame, bg=self.rail_panel_alt_bg)
         button_shell.pack(fill=tk.X)
         for column in range(columns):
             button_shell.grid_columnconfigure(column, weight=1, uniform=f"{group_key}_actions")
@@ -359,16 +468,43 @@ class GridlineApp:
             pady=6,
         )
 
+    def _make_shell_button(self, parent: tk.Widget, label: str, command) -> tk.Button:
+        return tk.Button(
+            parent,
+            text=label,
+            command=command,
+            bg="#132235",
+            fg=self.spec.visuals.text,
+            activebackground="#1C3654",
+            activeforeground=self.spec.visuals.text,
+            relief=tk.FLAT,
+            disabledforeground="#6F8195",
+            anchor="w",
+            justify="left",
+            font=("Consolas", 10, "bold"),
+            height=2,
+            padx=10,
+            pady=6,
+        )
+
     def _section_label(self, parent: tk.Widget, text: str) -> tk.Label:
+        parent_bg = str(parent.cget("bg"))
         return tk.Label(
             parent,
             text=text,
             font=("Consolas", 10, "bold"),
-            bg=self.spec.visuals.sidebar,
+            bg=parent_bg,
             fg=self.spec.visuals.muted_text,
             anchor="w",
             justify="left",
         )
+
+    def _build_section_shell(self, parent: tk.Widget, title: str, bg_color: str, border_color: str) -> tuple[tk.Frame, tk.Frame]:
+        shell = tk.Frame(parent, bg=bg_color, highlightbackground=border_color, highlightthickness=1, bd=0)
+        self._section_label(shell, title).pack(fill=tk.X, padx=10, pady=(8, 6))
+        body = tk.Frame(shell, bg=bg_color)
+        body.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+        return shell, body
 
     def _sync_action_scrollregion(self, _event=None) -> None:
         self.action_canvas.configure(scrollregion=self.action_canvas.bbox("all"))
@@ -376,62 +512,270 @@ class GridlineApp:
     def _sync_action_canvas_width(self, event) -> None:
         self.action_canvas.itemconfigure(self.action_canvas_window, width=event.width)
 
+    def _sync_detail_scrollregion(self, _event=None) -> None:
+        self.detail_canvas.configure(scrollregion=self.detail_canvas.bbox("all"))
+
+    def _sync_detail_canvas_width(self, event) -> None:
+        self.detail_canvas.itemconfigure(self.detail_canvas_window, width=event.width)
+
+    def _on_sidebar_configure(self, _event=None) -> None:
+        self._queue_sidebar_rebalance()
+
+    def _queue_sidebar_rebalance(self) -> None:
+        if self._sidebar_rebalance_after_id is not None:
+            self.root.after_cancel(self._sidebar_rebalance_after_id)
+        self._sidebar_rebalance_after_id = self.root.after_idle(self._rebalance_sidebar_layout)
+
+    def _on_root_destroy(self, event) -> None:
+        if event.widget is not self.root:
+            return
+        self._cleanup_root_callbacks()
+        if getattr(tk, "_default_root", None) is self.root:
+            tk._default_root = None
+
+    def _cleanup_root_callbacks(self) -> None:
+        if self._sidebar_rebalance_after_id is not None:
+            try:
+                self.root.after_cancel(self._sidebar_rebalance_after_id)
+            except tk.TclError:
+                pass
+            self._sidebar_rebalance_after_id = None
+        if self._loop_after_id is not None:
+            try:
+                self.root.after_cancel(self._loop_after_id)
+            except tk.TclError:
+                pass
+            self._loop_after_id = None
+        if self._action_scroll_reset_after_id is not None:
+            try:
+                self.action_canvas.after_cancel(self._action_scroll_reset_after_id)
+            except tk.TclError:
+                pass
+            self._action_scroll_reset_after_id = None
+        if self._detail_scroll_reset_after_id is not None:
+            try:
+                self.detail_canvas.after_cancel(self._detail_scroll_reset_after_id)
+            except tk.TclError:
+                pass
+            self._detail_scroll_reset_after_id = None
+        self.loop_running = False
+
+    def _rebalance_sidebar_layout(self) -> None:
+        self._sidebar_rebalance_after_id = None
+        sidebar_height = self.sidebar.winfo_height()
+        if sidebar_height <= 1:
+            return
+        title_height = max(self.title_label.winfo_height(), self.title_label.winfo_reqheight())
+        status_height = max(self.status_frame.winfo_height(), self.status_frame.winfo_reqheight())
+        utility_height = max(self.utility_frame.winfo_height(), self.utility_frame.winfo_reqheight())
+        fixed_height = title_height + status_height + utility_height + 72
+        remaining = max(180, sidebar_height - fixed_height)
+        action_floor = 208
+        detail_min = 104
+        detail_max = 220
+        detail_height = min(detail_max, max(detail_min, remaining - action_floor))
+        if remaining < detail_min + action_floor:
+            detail_height = max(84, remaining - action_floor)
+        action_height = max(156, remaining - detail_height)
+        self.details_frame.configure(height=detail_height)
+        self.detail_canvas.configure(height=max(72, detail_height - 24))
+        self.action_canvas.configure(height=action_height)
+
     def _toggle_fullscreen(self, _event=None) -> None:
         if not self.spec.fullscreen_toggle_enabled:
             return
         self.fullscreen = not self.fullscreen
         self.root.attributes("-fullscreen", self.fullscreen)
+        self._queue_sidebar_rebalance()
 
     def _on_canvas_click(self, event) -> None:
+        if self.shell_state != "active_run":
+            return
         self.sim.click_world(event.x, event.y)
         self._refresh_sidebar()
 
-    def _new_game(self) -> None:
-        should_restart_loop = not self.loop_running or self.sim.game_over
+    def _reset_run(self) -> None:
+        self._cancel_scheduled_loop()
         self.root.update_idletasks()
         self.sim = GameSimulation(self._runtime_spec_for_canvas())
+        self.highest_power_funding = self.sim.power.funding_percent
+        self.power_deploy_count = 0
+        self.defeat_summary = {}
+        self.feedback_text.set("")
+        self._last_action_selection_signature = None
+        self._last_detail_selection_signature = None
+        self.sidebar_refresh_elapsed = self.sidebar_refresh_interval
+
+    def _start_run(self) -> None:
+        self._reset_run()
+        self.shell_state = "active_run"
         self._render()
         self._refresh_sidebar()
-        if should_restart_loop:
-            self._loop()
+        self._schedule_loop()
+
+    def _replay_run(self) -> None:
+        self._start_run()
+
+    def _resume_run(self) -> None:
+        if self.sim.game_over:
+            self._transition_to_defeat()
+            return
+        self.shell_state = "active_run"
+        self._render()
+        self._refresh_sidebar()
+        self._schedule_loop()
+
+    def _pause_run(self) -> None:
+        if self.shell_state != "active_run":
+            return
+        self._cancel_scheduled_loop()
+        self.shell_state = "paused"
+        self._render()
+        self._refresh_sidebar()
+
+    def _quit_app(self) -> None:
+        root = self.root
+        if root is None:
+            return
+        try:
+            root.update_idletasks()
+        except tk.TclError:
+            pass
+        try:
+            root.quit()
+        except tk.TclError:
+            pass
+        self._cleanup_root_callbacks()
+        try:
+            root.unbind("<Escape>")
+            root.unbind("<F11>")
+            root.unbind("<Destroy>")
+        except tk.TclError:
+            pass
+        try:
+            for child in root.winfo_children():
+                child.destroy()
+        except tk.TclError:
+            pass
+        try:
+            root.attributes("-fullscreen", False)
+        except tk.TclError:
+            pass
+        try:
+            root.withdraw()
+        except tk.TclError:
+            pass
+        self._release_tk_references()
+
+    def _release_tk_references(self) -> None:
+        for key, value in list(self.__dict__.items()):
+            if isinstance(value, dict):
+                value.clear()
+                continue
+            if isinstance(value, (tk.Variable, tk.Misc)):
+                self.__dict__[key] = None
+        gc.collect()
+
+    def _on_escape(self, _event=None) -> None:
+        if self.shell_state == "active_run":
+            if self.sim.game_over:
+                self._transition_to_defeat()
+                return
+            self._pause_run()
+        elif self.shell_state == "paused":
+            self._resume_run()
+
+    def _schedule_loop(self) -> None:
+        if self.shell_state != "active_run" or self._loop_after_id is not None:
+            return
+        self.loop_running = True
+        self._loop_after_id = self.root.after(self.tick_ms, self._loop)
+
+    def _cancel_scheduled_loop(self) -> None:
+        if self._loop_after_id is not None:
+            self.root.after_cancel(self._loop_after_id)
+            self._loop_after_id = None
+        self.loop_running = False
+
+    def _transition_to_defeat(self) -> None:
+        self._cancel_scheduled_loop()
+        self.shell_state = "defeat_summary"
+        self.defeat_summary = {
+            "cause_of_loss": "Corruption threshold exceeded",
+            "run_duration": self.sim.run_time,
+            "highest_phase_reached": self.sim.phase_label(self.sim.highest_phase_reached),
+            "corruption_percent_at_loss": self.sim.corruption_percent(),
+            "highest_power_funding": self.highest_power_funding,
+            "power_deploy_count": self.power_deploy_count,
+        }
+        self._render()
+        self._refresh_sidebar()
 
     def run(self) -> None:
-        self._loop()
         self.root.mainloop()
 
     def _loop(self) -> None:
-        self.loop_running = True
-        self.sim.update(1.0 / self.spec.simulation_tick_rate)
-        self._render()
-        self._refresh_sidebar()
-        if not self.sim.game_over:
-            self.root.after(self.tick_ms, self._loop)
-        else:
+        self._loop_after_id = None
+        if self.shell_state != "active_run":
             self.loop_running = False
+            return
+        previous_active_power = self.sim.power.active_hardpoint_id
+        self.sim.update(self.sim_dt)
+        self._track_run_metrics(previous_active_power)
+        if self.sim.game_over:
+            self._transition_to_defeat()
+            return
+        self._render()
+        self.sidebar_refresh_elapsed += self.sim_dt
+        if self.sidebar_refresh_elapsed >= self.sidebar_refresh_interval:
+            self._refresh_sidebar()
+            self.sidebar_refresh_elapsed = 0.0
+        self._schedule_loop()
+
+    def _track_run_metrics(self, previous_active_power: str | None) -> None:
+        self.highest_power_funding = max(self.highest_power_funding, self.sim.power.funding_percent)
+        if previous_active_power is None and self.sim.power.active_hardpoint_id is not None:
+            self.power_deploy_count += 1
 
     def _refresh_sidebar(self) -> None:
         hud = self.sim.hud_snapshot()
         recent_harvest = hud["recent_harvest_event"]
-        self.status_text.set(
-            "\n".join(
-                [
-                    f"Pressure: {self._pressure_badge(hud)}",
-                    f"Corruption: {self._meter_bar(hud['corruption_percent'], hud['failure_threshold'])} {hud['corruption_percent']:.1f}% / {hud['failure_threshold']:.0f}%",
-                    f"Coins: {hud['coins']}",
-                    f"Power: {self._power_status_text(hud)}",
-                    f"Level: {hud['level']}  Next: {hud['level_time_remaining']:.1f}s",
-                    f"Orbs: {hud['active_orb_count']}  Shots/s: {hud['shots_recent']}",
-                    f"Harvest: {self._recent_harvest_text(recent_harvest)}",
-                    f"Surge: {'ACTIVE' if hud['surge_active'] else 'idle'}",
-                    "Status: GAME OVER" if hud["game_over"] else "Status: running",
-                ]
-            )
-        )
+        status_line = {
+            "title_ready": "Status: ready",
+            "active_run": "Status: GAME OVER" if hud["game_over"] else "Status: running",
+            "paused": "Status: paused",
+            "defeat_summary": "Status: defeat summary",
+        }[self.shell_state]
+        status_rows = [
+            ("pressure", f"Pressure: {self._pressure_badge(hud)}"),
+            ("phase", f"Phase: {self._phase_status_text(hud)}"),
+            ("corruption", f"Corruption: {self._meter_bar(hud['corruption_percent'], hud['failure_threshold'])} {hud['corruption_percent']:.1f}% / {hud['failure_threshold']:.0f}%"),
+            ("coins", f"Coins: {hud['coins']}"),
+            ("power", f"Power: {self._power_status_text(hud)}"),
+            ("level", f"Level: {hud['level']}  Next: {hud['level_time_remaining']:.1f}s"),
+            ("telemetry", f"Orbs: {hud['active_orb_count']}  Shots/s: {hud['shots_recent']}"),
+            ("harvest", f"Harvest: {self._recent_harvest_text(recent_harvest)}"),
+            ("surge", f"Surge: {'ACTIVE' if hud['surge_active'] else 'idle'}"),
+            ("status", status_line),
+        ]
+        self.status_text.set("\n".join(text for _key, text in status_rows))
+        self._update_status_rows(status_rows, hud)
+        self.utility_hint_text.set(self._utility_hint())
         hardpoint = self.sim.selected_hardpoint()
         if hardpoint is None:
-            self.detail_text.set("Select a hardpoint on the perimeter to build, upgrade, or deploy power.")
+            if self.shell_state == "title_ready":
+                self.detail_text.set("Run ready. Use Start Run to enter live play.")
+            elif self.shell_state == "paused":
+                self.detail_text.set("Simulation paused. Resume to restore live commands.")
+            elif self.shell_state == "defeat_summary":
+                self.detail_text.set(self._defeat_summary_text())
+            else:
+                self.detail_text.set("Select a hardpoint on the perimeter to build, upgrade, or deploy power.")
             self.upgrade_text.set("")
             self._update_button_states(hud["selected_object"], hud["action_availability"])
+            self._maybe_reset_sidebar_scrolls(hud["selected_object"])
+            self._refresh_utility_buttons()
+            self._queue_sidebar_rebalance()
             return
         selected = hud["selected_object"]
         lines = [f"Selected: {hardpoint.hardpoint.key} ({hardpoint.hardpoint.side})"]
@@ -485,14 +829,72 @@ class GridlineApp:
                     *self._build_option_summaries(),
                 ]
             )
+        if self.shell_state == "paused":
+            lines.append("")
+            lines.append("Simulation paused. Resume to restore live commands.")
+        elif self.shell_state == "defeat_summary":
+            lines.extend(["", self._defeat_summary_text()])
         self.detail_text.set("\n".join(lines))
         self.upgrade_text.set("\n".join(hud["upgrade_preview"]))
         self._update_button_states(hud["selected_object"], hud["action_availability"])
-        self._maybe_reset_action_scroll(selected)
+        self._maybe_reset_sidebar_scrolls(selected)
+        self._refresh_utility_buttons()
+        self._queue_sidebar_rebalance()
+
+    def _update_status_rows(self, status_rows: list[tuple[str, str]], hud: dict[str, object]) -> None:
+        emphasis_keys = {"pressure", "phase", "corruption", "power"}
+        danger_keys = set()
+        visible_by_state = {
+            "title_ready": {"pressure", "phase", "corruption", "coins", "power", "status"},
+            "active_run": set(self.status_row_order),
+            "paused": {"pressure", "phase", "corruption", "power", "level", "surge", "status"},
+            "defeat_summary": {"pressure", "phase", "corruption", "power", "status"},
+        }
+        visible_keys = visible_by_state[self.shell_state]
+        if "[CRITICAL]" in self._pressure_badge(hud) or hud["game_over"]:
+            danger_keys.update({"pressure", "corruption"})
+        if hud["surge_active"]:
+            danger_keys.add("surge")
+        if "[CRITICAL]" in hud["active_phase_badge"]:
+            danger_keys.add("phase")
+        if self.sim.power.active_hardpoint_id is not None or hud["power_charged"]:
+            danger_keys.add("power")
+        for key, text in status_rows:
+            self.status_row_vars[key].set(text)
+            bg = self.rail_emphasis_bg if key in emphasis_keys else self.rail_panel_bg
+            fg = self.spec.visuals.text if key in emphasis_keys else self.spec.visuals.muted_text
+            if key in danger_keys:
+                bg = "#1A2332"
+                fg = self.spec.visuals.warning if key == "surge" else self.spec.visuals.text
+                if key in {"pressure", "corruption", "phase"} and (hud["game_over"] or "[CRITICAL]" in text):
+                    fg = self.spec.visuals.critical
+            self.status_row_labels[key].configure(bg=bg, fg=fg)
+        for key in self.status_row_order:
+            label = self.status_row_labels[key]
+            if label.winfo_manager():
+                label.pack_forget()
+        for key in self.status_row_order:
+            if key in visible_keys:
+                self.status_row_labels[key].pack(fill=tk.X, pady=(0, 2))
+
+    def _utility_hint(self) -> str:
+        if self.shell_state == "active_run":
+            return "Low-frequency session controls stay quiet here. Esc pauses. F11 toggles fullscreen."
+        if self.shell_state == "title_ready":
+            return "Start Run begins the session. F11 toggles fullscreen."
+        if self.shell_state == "paused":
+            return "Session controls are live here. Resume returns to the frozen board context."
+        return "Replay is the primary recovery action. Quit remains available as a secondary session control."
 
     def _update_button_states(self, selected: dict[str, object], availability: dict[str, tuple[bool, str]]) -> None:
         context = selected.get("kind", "none")
         self._update_context_action_labels(selected, availability)
+        if self.shell_state != "active_run":
+            for header in self.action_group_headers.values():
+                header.configure(fg=self.spec.visuals.muted_text)
+            for button in self.action_buttons.values():
+                button.configure(state=tk.DISABLED)
+            return
         tower = selected.get("tower")
         active_groups = {"power"}
         if context in {"none", "empty"}:
@@ -510,8 +912,42 @@ class GridlineApp:
         for key, button in self.action_buttons.items():
             enabled, _reason = availability.get(key, (True, ""))
             button.configure(state=tk.NORMAL if enabled else tk.DISABLED)
-        for button in self.utility_buttons.values():
-            button.configure(state=tk.NORMAL)
+
+    def _refresh_utility_buttons(self) -> None:
+        visible_by_state = {
+            "title_ready": ("start_run", "quit"),
+            "active_run": (),
+            "paused": ("resume", "replay", "quit"),
+            "defeat_summary": ("replay", "quit"),
+        }
+        visible = set(visible_by_state[self.shell_state])
+        primary_key = None if self.shell_state == "active_run" else self._shell_presentation()["primary_action_key"]
+        for key, button in self.utility_buttons.items():
+            if key in visible:
+                if button.winfo_manager() != "pack":
+                    button.pack(fill=tk.X, pady=3)
+                button.configure(state=tk.NORMAL)
+                self._style_shell_button(button, is_primary=key == primary_key)
+            elif button.winfo_manager():
+                button.pack_forget()
+
+    def _style_shell_button(self, button: tk.Button, is_primary: bool) -> None:
+        if is_primary:
+            button.configure(
+                bg="#245985",
+                fg="#F4FBFF",
+                activebackground="#2F6E9F",
+                activeforeground="#F4FBFF",
+                font=("Consolas", 10, "bold"),
+            )
+        else:
+            button.configure(
+                bg="#132235",
+                fg=self.spec.visuals.text,
+                activebackground="#1C3654",
+                activeforeground=self.spec.visuals.text,
+                font=("Consolas", 10, "bold"),
+            )
 
     def _update_context_action_labels(self, selected: dict[str, object], availability: dict[str, tuple[bool, str]]) -> None:
         buy_label = "Buy Mode"
@@ -554,14 +990,26 @@ class GridlineApp:
             f"{recent_harvest['mode_name']} ({recent_harvest['age']:.1f}s)"
         )
 
-    def _maybe_reset_action_scroll(self, selected: dict[str, object]) -> None:
+    def _maybe_reset_sidebar_scrolls(self, selected: dict[str, object]) -> None:
         selection_signature = (self.sim.selected_hardpoint_id, str(selected.get("kind", "none")))
         if selection_signature == self._last_action_selection_signature:
             return
         self._last_action_selection_signature = selection_signature
-        if selected.get("kind") != "empty":
-            return
-        self.action_canvas.after_idle(lambda: self.action_canvas.yview_moveto(0.0))
+        if self._action_scroll_reset_after_id is not None:
+            self.action_canvas.after_cancel(self._action_scroll_reset_after_id)
+        self._action_scroll_reset_after_id = self.action_canvas.after_idle(self._reset_action_scroll)
+        self._last_detail_selection_signature = selection_signature
+        if self._detail_scroll_reset_after_id is not None:
+            self.detail_canvas.after_cancel(self._detail_scroll_reset_after_id)
+        self._detail_scroll_reset_after_id = self.detail_canvas.after_idle(self._reset_detail_scroll)
+
+    def _reset_action_scroll(self) -> None:
+        self._action_scroll_reset_after_id = None
+        self.action_canvas.yview_moveto(0.0)
+
+    def _reset_detail_scroll(self) -> None:
+        self._detail_scroll_reset_after_id = None
+        self.detail_canvas.yview_moveto(0.0)
 
     def _power_status_text(self, hud: dict[str, object]) -> str:
         if self.sim.power.active_hardpoint_id is not None:
@@ -650,9 +1098,90 @@ class GridlineApp:
     def _state_badge(self, ready: bool, ready_text: str, waiting_text: str) -> str:
         return f"[{ready_text}]" if ready else f"[WAIT] {waiting_text}"
 
+    def _shell_presentation(self) -> dict[str, object]:
+        return {
+            "title_ready": {
+                "badge": "READY SHELL",
+                "title": "GRIDLINE READY",
+                "subhead": "Command rail armed. The board is loaded and waiting on your first deployment order.",
+                "primary_action_key": "start_run",
+                "primary_action_label": "Start Run",
+                "secondary_actions": ("Quit", "F11 Fullscreen"),
+                "accent": "#8BD3FF",
+                "panel_fill": "#09131E",
+            },
+            "paused": {
+                "badge": "PAUSE SHELL",
+                "title": "RUN PAUSED",
+                "subhead": "Simulation time is frozen. Board state and the current selection are preserved exactly for resume.",
+                "primary_action_key": "resume",
+                "primary_action_label": "Resume",
+                "secondary_actions": ("Replay", "Quit", "Esc Resume", "F11 Fullscreen"),
+                "accent": "#F2C46D",
+                "panel_fill": "#09131E",
+            },
+            "defeat_summary": {
+                "badge": "DEFEAT SHELL",
+                "title": "GRID FAILURE",
+                "subhead": "The run has resolved. Review the loss summary, then replay immediately or step away from the session.",
+                "primary_action_key": "replay",
+                "primary_action_label": "Replay",
+                "secondary_actions": ("Quit", "F11 Fullscreen"),
+                "accent": self.spec.visuals.critical,
+                "panel_fill": "#110B10",
+            },
+        }[self.shell_state]
+
+    def _defeat_summary_rows(self) -> list[str]:
+        if not self.defeat_summary:
+            return [
+                "Cause of loss: Run lost",
+                "Run duration: 0.0s",
+                "Highest phase reached: Opening Containment",
+                "Corruption at loss: 0.0%",
+                "Power usage: 0% peak funding, 0 deploys",
+            ]
+        return [
+            f"Cause of loss: {self.defeat_summary['cause_of_loss']}",
+            f"Run duration: {self.defeat_summary['run_duration']:.1f}s",
+            f"Highest phase reached: {self.defeat_summary['highest_phase_reached']}",
+            f"Corruption at loss: {self.defeat_summary['corruption_percent_at_loss']:.1f}%",
+            f"Power usage: {self.defeat_summary['highest_power_funding']}% peak funding, {self.defeat_summary['power_deploy_count']} deploys",
+        ]
+
+    def _defeat_summary_text(self) -> str:
+        return "\n".join(self._defeat_summary_rows())
+
+    def _phase_status_text(self, hud: dict[str, object]) -> str:
+        phase_transition = hud["phase_transition"]
+        if phase_transition is not None:
+            return f"[SHIFT] [{hud['active_phase_badge']}] {hud['active_phase_label']}"
+        return f"[{hud['active_phase_badge']}] {hud['active_phase_label']}"
+
+    def _phase_accent(self, phase_id: str) -> str:
+        return {
+            "opening_containment": "#8BD3FF",
+            "escalation": "#F2C46D",
+            "critical_load": self.spec.visuals.critical,
+        }[phase_id]
+
     def _render(self) -> None:
         self.canvas.delete("all")
-        self.canvas.create_rectangle(0, 0, self.canvas.winfo_width(), self.canvas.winfo_height(), fill=self.spec.visuals.playfield_overlay, outline="")
+        canvas_width = self.canvas.winfo_width()
+        canvas_height = self.canvas.winfo_height()
+        self.canvas.create_rectangle(0, 0, canvas_width, canvas_height, fill=self.spec.visuals.background, outline="")
+        board_left, board_top, board_right, board_bottom = self.sim.topology.playfield_rect
+        board_frame = blend_hex(self.spec.visuals.neutral_large, self.spec.visuals.background, 0.20)
+        self.canvas.create_rectangle(
+            board_left,
+            board_top,
+            board_right,
+            board_bottom,
+            fill=self.spec.visuals.playfield_overlay,
+            outline=board_frame,
+            width=2,
+            tags=("board_surface",),
+        )
         for segment_id, segment in self.sim.topology.segments.items():
             state = self.sim.segment_states[segment_id]
             a = self.sim.topology.nodes[segment.a]
@@ -749,8 +1278,145 @@ class GridlineApp:
         self.canvas.create_text(16, 16, anchor="nw", fill=self.spec.visuals.text, font=("Consolas", 12, "bold"), text=f"Coins {self.sim.coins}   Corruption {self.sim.corruption_percent():.1f}%   Orbs {len(self.sim.orbs)}   Enemies {len(self.sim.enemies)}")
         if self.sim.surge_time_remaining > 0:
             self.canvas.create_text(16, 36, anchor="nw", fill=self.spec.visuals.warning, font=("Consolas", 11, "bold"), text=f"SURGE ACTIVE {self.sim.surge_time_remaining:.1f}s")
-        if self.sim.game_over:
+        self._render_phase_banner()
+        if self.shell_state == "active_run" and self.sim.game_over:
             self.canvas.create_text(self.canvas.winfo_width() / 2, 36, fill=self.spec.visuals.critical, font=("Consolas", 16, "bold"), text="GRID FAILURE")
+        self._render_shell_overlay(canvas_width, canvas_height)
+
+    def _render_phase_banner(self) -> None:
+        if self.shell_state != "active_run":
+            return
+        phase_transition = self.sim.phase_transition_snapshot()
+        if phase_transition is None:
+            return
+        board_left, board_top, board_right, _board_bottom = self.sim.topology.playfield_rect
+        center_x = (board_left + board_right) / 2
+        banner_width = min(360, board_right - board_left - 80)
+        banner_height = 42
+        left = center_x - banner_width / 2
+        top = board_top + 14
+        right = center_x + banner_width / 2
+        bottom = top + banner_height
+        accent = self._phase_accent(str(phase_transition["phase_id"]))
+        self.canvas.create_rectangle(left, top, right, bottom, fill="#0A1622", outline=accent, width=2, tags=("phase_banner",))
+        self.canvas.create_text(
+            left + 16,
+            top + 12,
+            anchor="nw",
+            fill=accent,
+            font=("Consolas", 9, "bold"),
+            text=f"{phase_transition['badge']} // {phase_transition['label']}",
+            tags=("phase_banner",),
+        )
+        self.canvas.create_text(
+            center_x,
+            top + 28,
+            anchor="center",
+            fill=self.spec.visuals.text,
+            font=("Consolas", 9),
+            text=str(phase_transition["banner_text"]),
+            tags=("phase_banner",),
+        )
+
+    def _render_shell_overlay(self, canvas_width: int, canvas_height: int) -> None:
+        if self.shell_state == "active_run":
+            return
+        presentation = self._shell_presentation()
+        overlay_width = min(440, max(320, canvas_width - 120))
+        overlay_height = 250 if self.shell_state == "defeat_summary" else 196
+        left = (canvas_width - overlay_width) / 2
+        top = (canvas_height - overlay_height) / 2
+        right = left + overlay_width
+        bottom = top + overlay_height
+        border = blend_hex(self.spec.visuals.neutral_large, self.spec.visuals.background, 0.35)
+        accent = str(presentation["accent"])
+        self.canvas.create_rectangle(
+            0,
+            0,
+            canvas_width,
+            canvas_height,
+            fill="#02060A",
+            outline="",
+            stipple="gray25",
+            tags=("shell_overlay",),
+        )
+        self.canvas.create_rectangle(
+            left,
+            top,
+            right,
+            bottom,
+            fill=str(presentation["panel_fill"]),
+            outline=border,
+            width=2,
+            tags=("shell_overlay",),
+        )
+        self.canvas.create_rectangle(left, top, right, top + 8, fill=accent, outline="", tags=("shell_overlay",))
+        self.canvas.create_text(
+            left + 24,
+            top + 24,
+            anchor="nw",
+            fill=blend_hex(accent, self.spec.visuals.background, 0.15),
+            font=("Consolas", 9, "bold"),
+            text=str(presentation["badge"]),
+            tags=("shell_overlay",),
+        )
+        self.canvas.create_text(
+            left + 24,
+            top + 48,
+            anchor="nw",
+            fill=self.spec.visuals.text,
+            font=("Consolas", 18, "bold"),
+            text=str(presentation["title"]),
+            tags=("shell_overlay",),
+        )
+        self.canvas.create_text(
+            left + 24,
+            top + 82,
+            anchor="nw",
+            width=overlay_width - 48,
+            fill=self.spec.visuals.muted_text,
+            font=("Consolas", 10),
+            justify="left",
+            text=str(presentation["subhead"]),
+            tags=("shell_overlay",),
+        )
+        primary_label = f"PRIMARY // {presentation['primary_action_label']}"
+        secondary_label = "AUX // " + "   ".join(str(label) for label in presentation["secondary_actions"])
+        self.canvas.create_rectangle(left + 24, bottom - 60, left + 186, bottom - 28, fill=accent, outline="", tags=("shell_overlay",))
+        self.canvas.create_text(
+            left + 36,
+            bottom - 44,
+            anchor="w",
+            fill="#03111A",
+            font=("Consolas", 10, "bold"),
+            text=primary_label,
+            tags=("shell_overlay",),
+        )
+        self.canvas.create_text(
+            left + 24,
+            bottom - 16,
+            anchor="sw",
+            width=overlay_width - 48,
+            fill=self.spec.visuals.muted_text,
+            font=("Consolas", 9),
+            justify="left",
+            text=secondary_label,
+            tags=("shell_overlay",),
+        )
+        if self.shell_state == "defeat_summary":
+            summary_top = top + 126
+            for index, row in enumerate(self._defeat_summary_rows()):
+                self.canvas.create_text(
+                    left + 24,
+                    summary_top + index * 22,
+                    anchor="nw",
+                    width=overlay_width - 48,
+                    fill=self.spec.visuals.text if index == 0 else self.spec.visuals.muted_text,
+                    font=("Consolas", 10, "bold" if index == 0 else "normal"),
+                    justify="left",
+                    text=row,
+                    tags=("shell_overlay",),
+                )
 
     def _segment_position(self, segment_id: str, from_node_id: str, distance: float) -> tuple[float, float]:
         return segment_position(self.sim.topology, segment_id, from_node_id, distance)

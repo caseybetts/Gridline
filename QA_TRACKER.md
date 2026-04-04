@@ -65,7 +65,10 @@ Use this file as the QA-facing working list. Use `agent_log.txt` for formal cros
 | BUG-016 | `P1` | Orb-impact, harvest-result, and economy attribution feedback | `pass` | Coder | Real green/red line-state steps now pair the existing line flash with local `+coins` harvest popups, a recent-harvest HUD line, and selected-tower economy telemetry so testers can tell what income was earned and by which tower behavior. |
 | BUG-017 | `P1` | Default edge-tower interior influence | `pass` | Coder | Default `Basic Tower` and `Seed Tower` output now applies interior-favoring turn/target rules from edge hardpoints so they stop settling into persistent perimeter-only coverage. |
 | BUG-018 | `P1` | Grouped action-shell stability | `pass` | Coder | The selection panel now uses a stable height budget and fixed button line count so the grouped action shells stay visually stationary through normal selection changes at the minimum supported window. |
-| BUG-019 | `P1` | Section 20 role separation and late-use value | `verify_fix` | Coder | The live config now gives later power funding more runway, raises the power-leaning floor to `60%`, and materially strengthens the three secondary modes while still blocking immediate full-charge opener rush. |
+| BUG-019 | `P1` | Section 20 role separation and late-use value | `pass` | Coder | The stabilized live config now clears the focused late-use guard suite, mixed and delayed seeded follow-ups both hit `100%` funding with real deploys across seeds `1`, `7`, and `13`, and direct power-rush still tops out at `70%` funding with no deploy across those seeds. |
+| BUG-020 | `P3` | Playfield bounds framing | `pass` | Coder | The dedicated board surface/frame now terminates exactly at `topology.playfield_rect`, and the surrounding canvas reads as darker background instead of extra playable grid. |
+| BUG-021 | `P2` | Supported-window control reachability | `pass` | Coder | At the supported `1280x720` floor, pinned sidebar regions plus internal detail overflow and occupied-selection resets keep the first tower-control row visible and the action region reachable. |
+| BUG-022 | `P0` | Ready-shell start control visibility | `pass` | Coder | Ready-shell status rows now collapse to a startup-safe subset and the sidebar reserves visible utility space so the `Start Run` control stays mapped and reachable at the default `1280x720` launch size. |
 
 ## Bug Details
 
@@ -453,7 +456,7 @@ Use this file as the QA-facing working list. Use `agent_log.txt` for formal cros
 
 ### BUG-019: Secondary-mode tradeoffs and power-tower timing still do not read as strong late-use decisions
 - Feature Tested: Section 20 role separation, secondary-mode usefulness, and power-tower timing/value
-- Status: `VERIFY_FIX`
+- Status: `PASS`
 - Source: tester live-config evaluation against `game_summary.md` current milestone and `Game_Design.md` section `20`
 - Priority: `P1`
 - Coder Target:
@@ -461,19 +464,84 @@ Use this file as the QA-facing working list. Use `agent_log.txt` for formal cros
   - `gridline/spec.py`
   - `game_config.json`
   - `tests/test_simulation.py`
-- Bug Description: The broader Section 20 lane is now readable enough to judge, but the late-use systems still do not produce a clean qualitative read in the current live config. In paired seeded probes, `Guard Mode` was only a narrow tradeoff, `Recall Mode` and `Focus Mode` shortened survival versus equivalent default-mode lines, and proactive power funding in an otherwise competent mixed line reduced survival instead of behaving like an attractive emergency stabilizer. The same live config also allows immediate full power funding from starting economy if the player greedily buys chunks, which muddies the intended late-use timing.
+- Bug Description: Earlier retunes kept the immediate full-charge opener exploit blocked and preserved the minute-two floor, but late-use power value still lagged: competent mixed and power-leaning follow-ups stopped short of a real charge/deploy decision, so the power tower did not yet read as a convincing emergency-stabilizer timing choice in this lane.
 - Reproduction Steps:
-  1. Run the current live-config baseline regressions by directly invoking `test_live_config_opener_styles_reach_the_minute_two_checkpoint_window()` and `test_live_config_power_rush_can_reach_a_real_power_deploy_window()` from `tests/test_simulation.py`.
-  2. Run paired seeded simulations with identical build orders except for one change: leave a tower in default mode versus buying and activating its fixed secondary mode (`Basic` vs `Guard`, `Seed` vs `Recall`, `Burst` vs `Focus`).
-  3. Repeat with a mixed three-tower line that either spends on normal expansion only or diverts ongoing income into power funding once the board is established.
-  4. Compare `run_duration`, practical power usage, and whether the altered line creates a clearer or stronger role-specific decision instead of simply shortening survival.
+  1. Run the current live-config guard checks by directly invoking `test_live_config_opener_styles_reach_the_minute_two_checkpoint_window()`, `test_live_config_power_rush_can_reach_a_real_power_deploy_window()`, and `test_live_config_starting_economy_cannot_buy_full_power_charge_immediately()` from `tests/test_simulation.py`.
+  2. Run paired seeded simulations on seeds `1`, `7`, and `13` with identical build orders except for one change: leave a tower in default mode versus buying and activating its fixed secondary mode (`Basic` vs `Guard`, `Seed` vs `Recall`, `Burst` vs `Focus`).
+  3. Run a mixed three-tower line that keeps expanding normally, then rerun the same line while diverting post-stabilization income into power funding.
+  4. Run the current power-leaning follow-up on seeds `1`, `7`, and `13` and record `highest_power_funding`, `charge_stored`, and `power_deploy_count`.
+  5. Compare `run_duration`, corruption pressure, and practical power usage to see whether the stronger live config now makes later funding and secondary swaps feel worthwhile rather than merely non-fatal.
 - Expected vs. Actual Result:
   - Expected: Secondary modes should solve real situational weaknesses without replacing default behavior in ordinary play, and power funding should create a meaningful clutch timing/value decision rather than either crowding out expansion or reading as ignorable.
-  - Actual: Coder pushed a second live-config retune that raises starting runway, harvest income, and late-use mode strength without restoring the opener full-charge exploit. Direct runtime checks now pass the minute-two opener floor, the no-immediate-full-charge guard, and the updated power-leaning funding regression with a higher `60%` floor (`4 passed`). A short two-seed coder spot-check no longer showed the across-the-board mode penalty from the prior batch (`Basic`/`Guard` `360s` vs `360s`, `Seed`/`Recall` `336s` vs `336s`, `Burst`/`Focus` `360s` vs `360s`), but tester must re-run the broader three-seed qualitative pass before this can be closed.
+  - Actual: Re-test confirmed the late-use fix. `python -m pytest tests/test_simulation.py -q -k "game_config_overrides_runtime_spec or minute_two_checkpoint_window or power_rush_can_reach_a_real_power_deploy_window or starting_economy_cannot_buy_full_power_charge_immediately or mixed_follow_up_reaches_a_broader_late_funding_window or delayed_power_follow_up_holds_the_late_funding_floor"` returned `6 passed`; direct seeded helper probes reproduced `100%` funding plus real deploys in both the mixed and delayed follow-ups across seeds `1` / `7` / `13`; and the direct power-rush line still topped out at `70%` funding with `0` deploys across those same seeds instead of becoming the new dominant rush.
 - QA Verification Notes:
-  - Re-run the broader paired seeded probes for default vs `Guard Mode`, `Recall Mode`, and `Focus Mode` on seeds `1`, `7`, and `13`, plus the mixed-line and power-leaning follow-ups.
-  - Confirm the opener full-charge exploit remains blocked while the stronger live-config economy now makes later power funding feel practical enough to judge.
-  - `OBJ-014` remains open until secondary-mode value and power timing can be judged without the prior contradictory signals.
+  - The deferred app-layer smoke also held: an instrumented `GridlineApp` probe reported `tick_ms=16`, `sidebar_refresh_interval=0.1`, `render_calls=120`, `refresh_calls=19`, `active_orbs=3`, and `game_over=False` across `120` live loops.
+  - Stronger seeded late-game lines can recycle power repeatedly once stabilized, so repeated redeploy volume should stay under watch during broader Section 20 evaluation even though the immediate `BUG-019` gate now passes.
+
+### BUG-020: Grid framing overruns the intended playable boundary on the right edge
+- Feature Tested: Playfield framing and board-boundary presentation
+- Status: `PASS`
+- Source: planner triage of `Play_Tester_Notes.md`
+- Priority: `P3`
+- Coder Target:
+  - `gridline/app.py`
+  - `gridline/topology.py`
+- Bug Description: A playtester reports that the rendered grid continues beyond the apparent row/column boundary of the playable field on the right side. Even if this comes from scaling or padding logic rather than gameplay state, it makes the board extents read incorrectly and weakens the intended clean technical framing.
+- Reproduction Steps:
+  1. Launch the current build in the default windowed view.
+  2. Inspect the right edge of the grid relative to the outer playable lanes and hardpoint envelope.
+  3. Compare the visible right-edge termination to the other board edges.
+  4. Repeat in fullscreen if needed to determine whether the issue is tied to scaling.
+- Expected vs. Actual Result:
+  - Expected: The grid should terminate cleanly at the approved playable-area / hardpoint boundary instead of reading as if it extends into non-playable space.
+  - Actual: Re-test confirmed the fix. `python -m pytest tests/test_simulation.py -q -k "occupied_hardpoint_selection_resets_action_scroll_to_tower_controls or selection_region_handles_long_detail_overflow_inside_its_own_scroll_body or action_group_positions_stay_stationary_through_selection_changes or rendered_board_surface_uses_topology_playfield_rect"` passed (`4 passed`), and a direct runtime probe showed the rendered `board_surface` rectangle matching `topology.playfield_rect` exactly at `24,24,888,696` in both the default `1280x720` windowed probe and the fullscreen toggle probe.
+- QA Verification Notes:
+  - The targeted board-surface regression passed.
+  - The direct runtime probe showed the darker outer canvas sitting outside the framed board rectangle instead of extending the playable grid read.
+  - This closes the accepted right-edge framing issue for the current MVP scope.
+
+### BUG-021: Core controls are not reliably visible on smaller laptop-sized windows
+- Feature Tested: Supported minimum-window action visibility and reachability
+- Status: `PASS`
+- Source: planner triage of `Play_Tester_Notes.md`
+- Priority: `P2`
+- Coder Target:
+  - `gridline/app.py`
+  - `tests/test_simulation.py`
+- Bug Description: The grouped/stable sidebar pass improved structure, but a playtester still reports that smaller laptop-sized windows can leave some buttons off-screen or otherwise not immediately visible. The approved behavior is that supported-window play does not rely on a large display to expose core actions.
+- Reproduction Steps:
+  1. Launch the current build in windowed mode at the minimum supported laptop-sized window, or the smallest real laptop resolution the project intends to support.
+  2. Select empty and occupied hardpoints that expose different action groups.
+  3. Check whether build, upgrade, mode, and power-related controls remain visible or immediately reachable within the structured action region.
+  4. Compare against a larger display to confirm the issue is specific to smaller supported windows rather than a general missing-control bug.
+- Expected vs. Actual Result:
+  - Expected: At the supported minimum window, core actions should remain visible or immediately reachable without relying on a large monitor.
+  - Actual: Re-test confirmed the fix. The same focused pytest run passed (`4 passed`), and a direct `1280x720` runtime probe showed the occupied-selection action region resetting to `yview 0.0`, the first `Tower Controls` row staying inside the visible `208 px` action region (`tower_top = 92`), and long selection text overflowing inside the `106 px` detail canvas instead of stealing the action region footprint.
+- QA Verification Notes:
+  - New regressions `test_occupied_hardpoint_selection_resets_action_scroll_to_tower_controls()` and `test_selection_region_handles_long_detail_overflow_inside_its_own_scroll_body()` passed alongside grouped-shell stability and board-surface termination.
+  - The occupied-selection runtime probe also reset the detail scroll back to the top, keeping the detail overflow isolated from the action region.
+  - This closes the supported-window reachability issue at the declared `1280x720` support floor.
+
+### BUG-022: Ready shell can hide the primary Start Run control at startup
+- Feature Tested: Ready-shell primary action visibility and start-of-session reachability
+- Status: `PASS`
+- Source: tester follow-up after live user report against `FEATURE-RAIL-001`
+- Priority: `P0`
+- Coder Target:
+  - `gridline/app.py`
+- Bug Description: The ready shell currently tells the player that `Start Run` is the primary action, but at the default `1280x720` startup size the bottom `Utility` section collapses to effectively zero visible height. The `start_run` button remains packed, yet it renders outside the visible sidebar viewport, so the player cannot reliably start the run from the ready shell.
+- Reproduction Steps:
+  1. Launch the app into the default ready shell.
+  2. Leave the window at the default startup size (`1280x720` in the current runtime spec).
+  3. Inspect the bottom `Utility` section where `Start Run` should appear.
+  4. Compare the visible sidebar content to the ready-shell overlay text that calls out `Start Run` as the primary action.
+- Expected vs. Actual Result:
+  - Expected: The ready shell shows a visible, reachable `Start Run` button inside the sidebar command rail at startup.
+  - Actual: Re-test confirmed the fix. Focused pytest checks passed, and direct runtime probes at the default `1280x720` startup window measured `utility_h=114`, `start_h=23`, and `button_y=667`, leaving the `Start Run` control visible and reachable without resizing.
+- QA Verification Notes:
+  - `python -m pytest tests/test_simulation.py -q -k "utility_frame_winfo_height or sidebar_uses_contextual_action_groups or shell_flow_boot_pause_resume_and_defeat_replay or power_status_and_actions_show_funding_and_ready_state_clearly or occupied_hardpoint_selection_resets_action_scroll_to_tower_controls or selection_region_handles_long_detail_overflow_inside_its_own_scroll_body"` passed (`5 passed`).
+  - Direct startup probes at both the default runtime spec and an explicit `1280x720` spec kept the ready-shell `Start Run` button visible (`visible=1`).
+  - Follow-up runtime checks still held for pause/resume shell flow, critical-phase row/banner behavior, and supported-window action reachability.
 
 ## Next QA Sequence
 1. Re-run smoke and interaction testing after the next coder pass.

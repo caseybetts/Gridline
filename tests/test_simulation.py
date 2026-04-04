@@ -42,13 +42,17 @@ def test_game_config_overrides_runtime_spec():
     assert spec.starting_coins == 339
     assert spec.hardpoint_count == 12
     assert spec.level_interval == 45
+    assert spec.simulation_tick_rate == 60
+    assert spec.hud_refresh_rate == 10
     assert spec.spread_interval == 24
-    assert spec.harvest_income_green == (7, 12, 20)
+    assert spec.green_spread_interval == 10
+    assert spec.green_spread_chance_by_tier == {"large": 0.13, "medium": 0.115, "small": 0.095}
+    assert spec.harvest_income_green == (10, 18, 30)
     assert spec.power_funding_chunk_cost == 34
     assert spec.power_duration == 6
-    assert spec.towers["basic_tower"].build_cost == 55
+    assert spec.towers["basic_tower"].build_cost == 26
     assert spec.towers["seed_tower"].shot_range == 340
-    assert spec.towers["basic_tower"].secondary_mode.purchase_cost == 15
+    assert spec.towers["basic_tower"].secondary_mode.purchase_cost == 10
     assert spec.towers["seed_tower"].secondary_mode.fire_rate_multiplier == 2.2
     assert spec.towers["burst_tower"].secondary_mode.shot_cost_multiplier == 0.25
     assert spec.enemies["tower_striker"].hp == 25
@@ -421,6 +425,44 @@ def test_harvest_income_creates_popup_and_selected_tower_economy_snapshot():
     assert hud["selected_tower_economy"]["shot_cost"] == 2.0
 
 
+def test_phase_promotions_are_one_way_and_hud_reports_persistent_phase_state():
+    sim = GameSimulation(default_spec())
+
+    hud = sim.hud_snapshot()
+    assert hud["active_phase"] == "opening_containment"
+    assert hud["active_phase_label"] == "Opening Containment"
+    assert hud["highest_phase_reached"] == "opening_containment"
+    assert hud["phase_transition"] is None
+
+    sim.level = 4
+    sim._evaluate_phase_state()
+    hud = sim.hud_snapshot()
+    assert hud["active_phase"] == "escalation"
+    assert hud["highest_phase_reached"] == "escalation"
+    assert hud["phase_transition"]["phase_id"] == "escalation"
+
+    sim.level = 1
+    sim.corruption_percent = lambda: 0.0
+    sim._evaluate_phase_state()
+    hud = sim.hud_snapshot()
+    assert hud["active_phase"] == "escalation"
+    assert hud["highest_phase_reached"] == "escalation"
+
+
+def test_phase_can_jump_directly_to_critical_and_banner_does_not_stack():
+    sim = GameSimulation(default_spec())
+
+    sim.level = 9
+    sim._evaluate_phase_state()
+    hud = sim.hud_snapshot()
+
+    assert hud["active_phase"] == "critical_load"
+    assert hud["highest_phase_reached"] == "critical_load"
+    assert hud["phase_transition"]["phase_id"] == "critical_load"
+    assert hud["phase_transition"]["label"] == "Critical Load"
+    assert sim.phase_transition_timer == 1.2
+
+
 def test_corruption_seed_creates_pulse_and_enemy_telegraph_darkens():
     sim = GameSimulation(default_spec())
     node_id = next(iter(sim.topology.nodes))
@@ -440,12 +482,26 @@ def test_corruption_seed_creates_pulse_and_enemy_telegraph_darkens():
 def test_sidebar_uses_contextual_action_groups():
     app = GridlineApp(default_spec())
     app.root.update()
+    assert app.shell_state == "title_ready"
+    assert app.utility_buttons["start_run"].winfo_manager() == "pack"
+    assert app.utility_buttons["quit"].winfo_manager() == "pack"
+    assert app.action_buttons["build_basic_tower"].cget("state") == "disabled"
+    assert app.status_frame.cget("highlightthickness") == 1
+    assert app.details_frame.cget("highlightthickness") == 1
+    assert app.actions_shell.cget("highlightthickness") == 1
+    assert app.utility_frame.cget("highlightthickness") == 1
+    start_button = app.utility_buttons["start_run"]
+    assert app.utility_frame.winfo_height() > 80
+    assert start_button.winfo_height() >= 20
+    assert start_button.winfo_rooty() >= app.root.winfo_rooty()
+
+    app._start_run()
+    app.root.update_idletasks()
     first = next(iter(app.sim.hardpoints.values()))
     app.sim.selected_hardpoint_id = first.hardpoint.key
     app._refresh_sidebar()
     app.root.update_idletasks()
 
-    assert "new_game" in app.utility_buttons
     assert app.action_groups["build"].winfo_manager() == "pack"
     assert app.action_groups["tower"].winfo_manager() == "pack"
     assert app.action_buttons["build_basic_tower"].cget("text") == "Basic | 55c"
@@ -454,6 +510,9 @@ def test_sidebar_uses_contextual_action_groups():
     assert app.action_buttons["build_burst_tower"].grid_info()["column"] == 2
     assert "Build priorities:" in app.detail_text.get()
     assert "reliable generalist" in app.detail_text.get()
+    assert app.status_row_vars["pressure"].get().startswith("Pressure:")
+    assert "Esc pauses" in app.utility_hint_text.get()
+    assert app.status_row_labels["pressure"].cget("bg") != app.utility_frame.cget("bg")
 
     app.sim.build_tower("seed_tower")
     app._refresh_sidebar()
@@ -463,7 +522,7 @@ def test_sidebar_uses_contextual_action_groups():
     assert app.action_buttons["upgrade_fire_rate"].grid_info()["column"] == 0
     assert app.action_buttons["upgrade_hp"].grid_info()["column"] == 1
 
-    app.root.destroy()
+    app._quit_app()
 
 
 def test_empty_hardpoint_selection_resets_action_scroll_to_build_controls():
@@ -485,7 +544,32 @@ def test_empty_hardpoint_selection_resets_action_scroll_to_build_controls():
 
     assert 0.0 in calls
     assert app.action_groups["build"].winfo_manager() == "pack"
-    app.root.destroy()
+    app._quit_app()
+
+
+def test_occupied_hardpoint_selection_resets_action_scroll_to_tower_controls():
+    app = GridlineApp(default_spec())
+    app.root.geometry("1280x720")
+    app.root.update()
+    hardpoints = list(app.sim.hardpoints.values())
+    first = hardpoints[0]
+    second = hardpoints[1]
+    app.sim.selected_hardpoint_id = first.hardpoint.key
+    app.sim.build_tower("seed_tower")
+    app.sim.selected_hardpoint_id = second.hardpoint.key
+    app.sim.build_tower("basic_tower")
+    app._refresh_sidebar()
+    app.root.update_idletasks()
+
+    calls = []
+    app.action_canvas.yview_moveto = lambda value: calls.append(value)
+    app.sim.selected_hardpoint_id = first.hardpoint.key
+    app._refresh_sidebar()
+    app.root.update_idletasks()
+
+    assert 0.0 in calls
+    assert app.action_groups["tower"].winfo_y() + app.action_buttons["buy_secondary"].winfo_height() <= app.action_canvas.winfo_height()
+    app._quit_app()
 
 
 def test_action_group_positions_stay_stationary_through_selection_changes():
@@ -513,7 +597,7 @@ def test_action_group_positions_stay_stationary_through_selection_changes():
     }
 
     assert occupied_positions == empty_positions
-    app.root.destroy()
+    app._quit_app()
 
 
 def test_sidebar_uses_explicit_secondary_mode_names_in_details_and_actions():
@@ -540,7 +624,7 @@ def test_sidebar_uses_explicit_secondary_mode_names_in_details_and_actions():
     assert "Recall Mode unlocked: Yes" in app.detail_text.get()
     assert app.action_buttons["swap_mode"].cget("text").startswith("To Default | Cooldown")
 
-    app.root.destroy()
+    app._quit_app()
 
 
 def test_power_status_and_actions_show_funding_and_ready_state_clearly():
@@ -551,6 +635,7 @@ def test_power_status_and_actions_show_funding_and_ready_state_clearly():
     app._refresh_sidebar()
     app.root.update_idletasks()
 
+    assert "Phase: [OPENING] Opening Containment" in app.status_text.get()
     assert "Power: [FUNDING] [.........." in app.status_text.get()
     assert app.action_buttons["fund_power"].cget("text") == "Fund +10% | 45c"
 
@@ -561,7 +646,7 @@ def test_power_status_and_actions_show_funding_and_ready_state_clearly():
     assert "Power: [READY] [##########] 100%" in app.status_text.get()
     assert app.action_buttons["deploy_power"].cget("text") == "Deploy | Ready"
 
-    app.root.destroy()
+    app._quit_app()
 
 
 def test_disabled_actions_show_reason_in_place_and_success_feedback_updates():
@@ -580,7 +665,23 @@ def test_disabled_actions_show_reason_in_place_and_success_feedback_updates():
     app.root.update_idletasks()
 
     assert app.feedback_text.get() == "Power funding: 0% -> 10%."
-    app.root.destroy()
+    app._quit_app()
+
+
+def test_selection_region_handles_long_detail_overflow_inside_its_own_scroll_body():
+    app = GridlineApp(default_spec())
+    app.root.geometry("1280x720")
+    app.root.update()
+    app.detail_text.set("\n".join(f"Detail line {index}" for index in range(18)))
+    app.feedback_text.set("\n".join(f"Feedback line {index}" for index in range(6)))
+    app.upgrade_text.set("\n".join(f"Upgrade line {index}" for index in range(8)))
+    app._queue_sidebar_rebalance()
+    app.root.update_idletasks()
+
+    assert app.detail_canvas.winfo_height() > 0
+    assert app.detail_inner.winfo_reqheight() > app.detail_canvas.winfo_height()
+    assert app.action_canvas.winfo_height() >= 156
+    app._quit_app()
 
 
 def test_harvest_impact_uses_distinct_effect_type():
@@ -685,6 +786,125 @@ def test_topology_respects_playfield_viewport_override_for_hardpoint_bounds():
     assert max_hardpoint_y <= bottom
 
 
+def test_rendered_board_surface_uses_topology_playfield_rect():
+    app = GridlineApp(default_spec())
+    app.root.update()
+    app._render()
+    app.root.update_idletasks()
+
+    board_items = app.canvas.find_withtag("board_surface")
+    assert len(board_items) == 1
+    coords = tuple(round(value, 2) for value in app.canvas.coords(board_items[0]))
+    expected = tuple(round(value, 2) for value in app.sim.topology.playfield_rect)
+    assert coords == expected
+    app._quit_app()
+
+
+def test_shell_flow_boot_pause_resume_and_defeat_replay():
+    app = GridlineApp(default_spec())
+    app.root.update()
+
+    assert app.shell_state == "title_ready"
+    assert app.loop_running is False
+    ready_text = "\n".join(
+        app.canvas.itemcget(item, "text")
+        for item in app.canvas.find_withtag("shell_overlay")
+        if app.canvas.type(item) == "text"
+    )
+    assert "READY SHELL" in ready_text
+    assert "GRIDLINE READY" in ready_text
+    assert "PRIMARY // Start Run" in ready_text
+    assert app.utility_buttons["start_run"].cget("bg") == "#245985"
+    assert app.utility_buttons["quit"].cget("bg") == "#132235"
+
+    app._start_run()
+    app.root.update_idletasks()
+    assert app.shell_state == "active_run"
+    assert app.utility_buttons["start_run"].winfo_manager() == ""
+
+    first = next(iter(app.sim.hardpoints.values()))
+    app.sim.selected_hardpoint_id = first.hardpoint.key
+    selected_before_pause = app.sim.selected_hardpoint_id
+    app.sim.run_time = 12.5
+    app._on_escape()
+
+    assert app.shell_state == "paused"
+    assert app.sim.selected_hardpoint_id == selected_before_pause
+    paused_time = app.sim.run_time
+    app._loop()
+    assert app.sim.run_time == paused_time
+    assert app.utility_buttons["resume"].winfo_manager() == "pack"
+    assert app.utility_buttons["replay"].winfo_manager() == "pack"
+    assert app.utility_buttons["quit"].winfo_manager() == "pack"
+    paused_text = "\n".join(
+        app.canvas.itemcget(item, "text")
+        for item in app.canvas.find_withtag("shell_overlay")
+        if app.canvas.type(item) == "text"
+    )
+    assert "PAUSE SHELL" in paused_text
+    assert "RUN PAUSED" in paused_text
+    assert "PRIMARY // Resume" in paused_text
+    assert app.utility_buttons["resume"].cget("bg") == "#245985"
+    assert app.utility_buttons["replay"].cget("bg") == "#132235"
+
+    app._on_escape()
+    assert app.shell_state == "active_run"
+
+    app.sim.level = 9
+    app.sim._evaluate_phase_state()
+    app._refresh_sidebar()
+    app._render()
+    app.root.update_idletasks()
+    phase_banner_text = "\n".join(
+        app.canvas.itemcget(item, "text")
+        for item in app.canvas.find_withtag("phase_banner")
+        if app.canvas.type(item) == "text"
+    )
+    assert "CRITICAL // Critical Load" in phase_banner_text
+    assert "Late-crisis recovery and power timing are live." in phase_banner_text
+    assert "Phase: [SHIFT] [CRITICAL] Critical Load" in app.status_text.get()
+
+    app.sim.run_time = 98.0
+    app.highest_power_funding = 80
+    app.power_deploy_count = 2
+    app.sim.game_over = True
+    app._transition_to_defeat()
+
+    assert app.shell_state == "defeat_summary"
+    assert "Cause of loss: Corruption threshold exceeded" in app.detail_text.get()
+    assert "Run duration: 98.0s" in app.detail_text.get()
+    assert app.utility_buttons["replay"].winfo_manager() == "pack"
+    assert app.utility_buttons["quit"].winfo_manager() == "pack"
+    assert app.utility_buttons["resume"].winfo_manager() == ""
+    defeat_text = "\n".join(
+        app.canvas.itemcget(item, "text")
+        for item in app.canvas.find_withtag("shell_overlay")
+        if app.canvas.type(item) == "text"
+    )
+    assert "DEFEAT SHELL" in defeat_text
+    assert "GRID FAILURE" in defeat_text
+    assert "PRIMARY // Replay" in defeat_text
+    assert "Cause of loss: Corruption threshold exceeded" in defeat_text
+    assert "Run duration: 98.0s" in defeat_text
+    assert "Highest phase reached: Critical Load" in defeat_text
+    assert "Corruption at loss:" in defeat_text
+    assert "Power usage: 80% peak funding, 2 deploys" in defeat_text
+    assert defeat_text.index("Cause of loss: Corruption threshold exceeded") < defeat_text.index("Run duration: 98.0s")
+    assert defeat_text.index("Run duration: 98.0s") < defeat_text.index("Highest phase reached: Critical Load")
+    assert defeat_text.index("Highest phase reached: Critical Load") < defeat_text.index("Corruption at loss:")
+    assert defeat_text.index("Corruption at loss:") < defeat_text.index("Power usage: 80% peak funding, 2 deploys")
+    assert app.utility_buttons["replay"].cget("bg") == "#245985"
+    assert app.utility_buttons["quit"].cget("bg") == "#132235"
+
+    app._replay_run()
+    assert app.shell_state == "active_run"
+    assert app.sim.run_time == 0.0
+    assert app.power_deploy_count == 0
+    assert app.highest_power_funding == 0
+
+    app._quit_app()
+
+
 def test_live_config_opener_styles_reach_the_minute_two_checkpoint_window():
     spec = load_game_spec("game_config.json")
 
@@ -763,6 +983,113 @@ def test_live_config_starting_economy_cannot_buy_full_power_charge_immediately()
 
     assert sim.power.funding_percent < 100
     assert sim.power.charged is False
+
+
+def _run_live_config_mixed_late_funding_follow_up(seed: int) -> dict[str, int | bool]:
+    spec = load_game_spec("game_config.json")
+    sim = GameSimulation(spec, seed=seed)
+    hardpoints = list(sim.hardpoints.values())
+    elapsed = 0.0
+    dt = 1.0 / sim.spec.simulation_tick_rate
+    highest_funding = 0
+    charged = False
+    deploy_count = 0
+
+    while not sim.game_over and elapsed < 360.0:
+        if hardpoints[0].tower is None:
+            sim.selected_hardpoint_id = hardpoints[0].hardpoint.key
+            sim.build_tower("basic_tower")
+        elif hardpoints[1].tower is None and elapsed >= 20.0:
+            sim.selected_hardpoint_id = hardpoints[1].hardpoint.key
+            sim.build_tower("seed_tower")
+        elif hardpoints[2].tower is None and elapsed >= 55.0:
+            sim.selected_hardpoint_id = hardpoints[2].hardpoint.key
+            sim.build_tower("burst_tower")
+        elif elapsed >= 90.0 and sim.fund_power_preview()[0]:
+            sim.fund_power()
+        highest_funding = max(highest_funding, sim.power.funding_percent)
+        if sim.power.charged:
+            charged = True
+            sim.selected_hardpoint_id = hardpoints[0].hardpoint.key
+            if sim.action_availability()["deploy_power"][0]:
+                if sim.deploy_power_to_selected():
+                    deploy_count += 1
+        sim.update(dt)
+        elapsed += dt
+
+    return {
+        "highest_funding": highest_funding,
+        "charged": charged,
+        "deploy_count": deploy_count,
+    }
+
+
+def _run_live_config_delayed_power_follow_up(seed: int) -> dict[str, int | bool]:
+    spec = load_game_spec("game_config.json")
+    sim = GameSimulation(spec, seed=seed)
+    hardpoints = list(sim.hardpoints.values())
+    elapsed = 0.0
+    dt = 1.0 / sim.spec.simulation_tick_rate
+    highest_funding = 0
+    charged = False
+    deploy_count = 0
+
+    while not sim.game_over and elapsed < 360.0:
+        if hardpoints[0].tower is None:
+            sim.selected_hardpoint_id = hardpoints[0].hardpoint.key
+            sim.build_tower("basic_tower")
+        elif elapsed < 18.0:
+            pass
+        elif sim.power.funding_percent < 30 and sim.fund_power_preview()[0]:
+            sim.fund_power()
+        elif hardpoints[1].tower is None and elapsed >= 40.0:
+            sim.selected_hardpoint_id = hardpoints[1].hardpoint.key
+            sim.build_tower("seed_tower")
+        elif elapsed >= 70.0 and sim.power.funding_percent < 60 and sim.fund_power_preview()[0]:
+            sim.fund_power()
+        elif hardpoints[2].tower is None and elapsed >= 95.0:
+            sim.selected_hardpoint_id = hardpoints[2].hardpoint.key
+            sim.build_tower("basic_tower")
+        elif elapsed >= 120.0 and sim.fund_power_preview()[0]:
+            sim.fund_power()
+        highest_funding = max(highest_funding, sim.power.funding_percent)
+        if sim.power.charged:
+            charged = True
+            sim.selected_hardpoint_id = hardpoints[0].hardpoint.key
+            if sim.action_availability()["deploy_power"][0]:
+                if sim.deploy_power_to_selected():
+                    deploy_count += 1
+        sim.update(dt)
+        elapsed += dt
+
+    return {
+        "highest_funding": highest_funding,
+        "charged": charged,
+        "deploy_count": deploy_count,
+    }
+
+
+def test_live_config_mixed_follow_up_reaches_a_broader_late_funding_window():
+    results = [
+        _run_live_config_mixed_late_funding_follow_up(seed)
+        for seed in (1, 7, 13)
+    ]
+    highest_by_seed = [int(result["highest_funding"]) for result in results]
+
+    assert min(highest_by_seed) >= 60
+    assert max(highest_by_seed) >= 100
+    assert any(bool(result["charged"]) or int(result["deploy_count"]) > 0 for result in results)
+
+
+def test_live_config_delayed_power_follow_up_holds_the_late_funding_floor():
+    results = [
+        _run_live_config_delayed_power_follow_up(seed)
+        for seed in (1, 7, 13)
+    ]
+    highest_by_seed = [int(result["highest_funding"]) for result in results]
+
+    assert min(highest_by_seed) >= 60
+    assert all(bool(result["charged"]) or int(result["deploy_count"]) > 0 for result in results)
 
 
 def _hex_luminance(color: str) -> int:

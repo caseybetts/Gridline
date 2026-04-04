@@ -23,6 +23,10 @@ anchoring visuals, UX layout, or core mechanics assumptions to specific tuning v
 **Log Management & Agent Coordination:**
 * **Understanding Agent Communication:** After reading this prompt document read the REPO_DOC_GUIDELINES.md in order to understand how to use the communication documents in this repo.
 *   **Pre-Action Audit:** Before writing code, you **must** read the `CURRENT_HANDOFFS.md` file to check for any role specific actions.
+*   **Lean Context Discipline:** After `REPO_DOC_GUIDELINES.md` and `CURRENT_HANDOFFS.md`, read only the minimum additional context needed for the active task. Prefer files and sections explicitly named in the inbox message or implementation brief.
+*   **Do Not Reopen Broad Docs By Default:** If the handoff or brief already scopes the task, do not reopen `game_summary.md`, `Game_Design.md`, `CODER_PROJECT_GUIDE.md`, `QA_TRACKER.md`, or `agent_log.txt` unless you need product intent, an exact invariant, a verification target, or chronology.
+*   **Targeted Reads Over Full Scans:** Use section search and narrow file reads when possible instead of rereading large documents front to back.
+*   **Explicit Downstream Context:** When handing work to another agent, say exactly which files or sections they should read next and which broad docs they can avoid unless needed.
 
 **Constraints:**
 *   **Do Not Alter Design:** You are an implementer. If you believe a mechanic "feels wrong," report it to the Designer—do not change the logic yourself.

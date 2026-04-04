@@ -102,7 +102,7 @@ class GameSpec:
     large_spacing: int = 96
     medium_spacing: int = 48
     small_spacing: int = 24
-    simulation_tick_rate: int = 30
+    simulation_tick_rate: int = 60
     hud_refresh_rate: int = 10
     spread_interval: float = 0.75
     green_spread_interval: float = 1.20
@@ -285,6 +285,7 @@ def load_game_spec(path: str | Path = "game_config.json") -> GameSpec:
     palette = visuals.get("palette", {})
     tower_placement = payload.get("tower_placement", {})
     economy = payload.get("economy", {})
+    telemetry = payload.get("telemetry", {})
     run = payload.get("run", {})
     corruption = payload.get("corruption", {})
     enemies = payload.get("enemies", {})
@@ -321,6 +322,7 @@ def load_game_spec(path: str | Path = "game_config.json") -> GameSpec:
     seed_defaults = _seed_target_defaults(raw_towers, spec)
 
     spread_interval = float(corruption.get("base_spread_interval_seconds", spec.spread_interval))
+    green_spread_interval = float(corruption.get("green_spread_interval_seconds", spread_interval))
     min_spawn = float(enemies.get("random_spawn_interval_min_seconds", spec.spawn_interval_floor))
     max_spawn = float(enemies.get("random_spawn_interval_max_seconds", spec.base_spawn_interval))
 
@@ -336,8 +338,24 @@ def load_game_spec(path: str | Path = "game_config.json") -> GameSpec:
         power_funding_chunk_cost=int(power_tower.get("funding_chunk_cost", spec.power_funding_chunk_cost)),
         corruption_failure_threshold=float(run.get("corruption_loss_threshold_percent", spec.corruption_failure_threshold)),
         level_interval=float(run.get("level_up_interval_seconds", spec.level_interval)),
+        simulation_tick_rate=int(run.get("simulation_tick_rate", spec.simulation_tick_rate)),
+        hud_refresh_rate=int(telemetry.get("hud_refresh_rate", spec.hud_refresh_rate)),
         spread_interval=spread_interval,
-        green_spread_interval=spread_interval,
+        green_spread_interval=green_spread_interval,
+        red_spread_chance_by_tier=_tier_float_map(
+            corruption.get("red_spread_chance_by_tier"),
+            spec.red_spread_chance_by_tier,
+        ),
+        green_spread_chance_by_tier=_tier_float_map(
+            corruption.get("green_spread_chance_by_tier"),
+            spec.green_spread_chance_by_tier,
+        ),
+        red_intensity_growth_chance=float(
+            corruption.get("red_intensity_growth_chance", spec.red_intensity_growth_chance)
+        ),
+        green_intensity_growth_chance=float(
+            corruption.get("green_intensity_growth_chance", spec.green_intensity_growth_chance)
+        ),
         base_spawn_interval=(min_spawn + max_spawn) / 2.0,
         spawn_interval_floor=min_spawn,
         spawn_rate_growth_per_level=float(enemies.get("spawn_count_increase_per_level", spec.spawn_rate_growth_per_level)),
@@ -385,6 +403,15 @@ def _intensity_hexes(palette: dict[str, object], key: str, fallbacks: tuple[str,
         "#{:02X}{:02X}{:02X}".format(*channels),
         "#{:02X}{:02X}{:02X}".format(*dark),
     )
+
+
+def _tier_float_map(raw: object, fallback: dict[str, float]) -> dict[str, float]:
+    if not isinstance(raw, dict):
+        return dict(fallback)
+    return {
+        tier: float(raw.get(tier, fallback[tier]))
+        for tier in ("large", "medium", "small")
+    }
 
 
 def _load_towers_from_config(raw_towers: list[dict[str, object]], spec: GameSpec) -> dict[str, TowerSpec]:
