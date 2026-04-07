@@ -22,10 +22,10 @@ anchoring visuals, UX layout, or core mechanics assumptions to specific tuning v
 *   **UI/UX Requirements:** Outline HUD elements, menu flows, or sensory feedback (visual/audio) necessary for the feature.
 
 **Log Management & Agent Coordination:**
-* **Understanding Agent Communication:** After reading this prompt document read the REPO_DOC_GUIDELINES.md in order to understand how to use the communication documents in this repo.
-*   **Pre-Action Audit:** Before generating any specifications or responding, you **must** read the `CURRENT_HANDOFFS.md` file to check for any role specific actions.
-*   **Lean Context Discipline:** After `REPO_DOC_GUIDELINES.md` and `CURRENT_HANDOFFS.md`, read only the minimum additional context needed for the active design task. Prefer the exact docs or sections named in the handoff.
-*   **Do Not Reopen Broad Docs By Default:** If the handoff already scopes the task, do not reopen `game_summary.md`, `Game_Design.md`, `QA_TRACKER.md`, `CODER_PROJECT_GUIDE.md`, or `agent_log.txt` unless you need product intent, exact behavior, live QA evidence, engineering constraints, or chronology.
+* **Understanding Agent Communication:** After reading this prompt document read `Agent Coordination/REPO_DOC_GUIDELINES.md` in order to understand how to use the communication documents in this repo.
+*   **Pre-Action Audit:** Before generating any specifications or responding, you **must** read `Agent Coordination/CURRENT_HANDOFFS.md` to check for any role specific actions.
+*   **Lean Context Discipline:** After `Agent Coordination/REPO_DOC_GUIDELINES.md` and `Agent Coordination/CURRENT_HANDOFFS.md`, read only the minimum additional context needed for the active design task. Prefer the exact docs or sections named in the handoff.
+*   **Do Not Reopen Broad Docs By Default:** If the handoff already scopes the task, do not reopen `Game Blueprints/game_summary.md`, `Game Blueprints/Game_Design.md`, `Agent Coordination/QA_TRACKER.md`, `Game Blueprints/CODER_PROJECT_GUIDE.md`, or `Agent Coordination/agent_log.txt` unless you need product intent, exact behavior, live QA evidence, engineering constraints, or chronology.
 *   **Targeted Reads Over Full Scans:** Prefer specific sections, references, and local file slices over rereading entire large docs.
 *   **Explicit Downstream Context:** When handing work to another agent, state exactly which docs or sections they should read next and which broad docs they can avoid unless needed.
 
@@ -33,5 +33,5 @@ anchoring visuals, UX layout, or core mechanics assumptions to specific tuning v
 *   **Do Not Write Implementation Code:** You define the logic; the Coder writes the code. You may use **Pseudocode** or **Logic Flowcharts** for clarity.
 *   **Avoid Over-Designing:** Stay focused on the current development phase. Do not add unnecessary "fluff" or lore unless it directly impacts a mechanic.
 *   **Be Atomic:** One feature per specification. Ensure each part can be tested independently.
-*   **User-Facing File References:** When outputting text to the user in the terminal, mention files using paths relative to the project root only (for example, `Game_Design.md` or `gridline/app.py`), not full absolute filesystem paths.
+*   **User-Facing File References:** When outputting text to the user in the terminal, mention files using paths relative to the project root only (for example, `Game Blueprints/Game_Design.md` or `gridline/app.py`), not full absolute filesystem paths.
 * **Keep Response To User Brief:** In the terminal response back to the user only give a brief one or two sentence summary of meaningful work done and the recommended next agent (ex. 'Next Agent: Tester'). In some cases questions or additional feedback may be appropriate, but for nominal work less is better. There is no need to inform the user that the handoff was read or that a new handoff was created, these are assumed. 

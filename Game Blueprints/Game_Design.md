@@ -309,7 +309,7 @@ It is intended to translate planner-approved decisions into coder-usable feature
 
 #### Open Questions
 
-- Secondary behavior purchase costs and swap cooldown timings remain open.
+- The starter purchase costs and shared swap-cooldown defaults are defined in Sections `14` and `20`; later tuning may revisit the numbers, but the mechanic is implementation-ready for the current MVP pass.
 
 ### 2B. Base Tower Archetypes
 
@@ -376,7 +376,7 @@ It is intended to translate planner-approved decisions into coder-usable feature
 
 #### Open Questions
 
-- Starting numeric profiles per archetype remain open.
+- The starter archetype profiles are defined in Section `13`; later tuning may adjust them, but the base tower roles and implementation defaults are locked for the current MVP pass.
 
 ### 2D. Fixed Secondary Behavior Mapping
 
@@ -436,7 +436,7 @@ It is intended to translate planner-approved decisions into coder-usable feature
 
 #### Open Questions
 
-- Exact purchase costs and per-mode tuning values remain open.
+- Purchase costs and starter per-mode values are defined in Section `14`; later tuning may adjust them, but the fixed mapping and current defaults are implementation-ready now.
 
 ### 2E. Secondary Behavior Definitions
 
@@ -499,7 +499,7 @@ It is intended to translate planner-approved decisions into coder-usable feature
 
 #### Open Questions
 
-- Exact tuning values for each secondary mode remain open.
+- Section `14` defines the starter secondary-mode overrides. Treat those as the current implementation defaults and revisit only in later tuning work.
 
 ### 2C. Seed Tower Targeting Controls
 
@@ -681,7 +681,7 @@ It is intended to translate planner-approved decisions into coder-usable feature
 
 #### Open Questions
 
-- Per-behavior cleaning coefficients and movement profiles still need explicit numeric defaults.
+- Sections `13`, `14`, and `17` define the current behavior coefficients and movement-profile defaults. Later balance work may revise them, but no extra default pass is needed before implementation.
 
 ### 3A. Seed Flight Geometry
 
@@ -962,7 +962,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 
 #### Open Questions
 
-- The exact cost curves and stat scaling formulas remain open.
+- The starter economy and upgrade defaults in Sections `12` through `14` are sufficient for the current MVP pass. Cost curves and scaling formulas can be revisited later during explicitly reopened tuning work.
 
 ### 6. Enemy Pressure and Surge Events
 
@@ -1155,6 +1155,93 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 
 - Later tuning may revise the exact thresholds, but the first implementation pass should use the concrete rules above rather than inventing a different transition mix.
 
+### 6B. Board Event Feedback Layer
+
+#### System Name & Goal
+
+- Goal: define one bounded board-side event-feedback layer so surge state and orb-caused corruption reduction read clearly on the playfield without being confused with phase transitions, harvest popups, or generic hit flashes.
+
+#### Core Mechanics
+
+1. The board uses a transient event-feedback layer above the static line state and below shell/HUD overlays.
+2. Surge feedback has two parts: a short activation stinger when a surge begins and a quieter persistent board-edge warning treatment while the surge remains active.
+3. Orb-caused red-line reduction uses a local segment-anchored clean/calm cue that appears only when a real red intensity drop or red-to-blue conversion occurs.
+4. Surge-active feedback and local corruption-reduction feedback may overlap in time, but they must remain visually distinct through scale, placement, and color language.
+5. Phase-change feedback remains a named top-center banner; surge feedback is a threat-state treatment and must not reuse the same presentation shape.
+
+#### Rules
+
+- Surge feedback is board-wide or perimeter-oriented; corruption-reduction feedback is local to the affected segment.
+- Surge activation must read as warning/escalation, using the approved warning family rather than the cleaner blue/teal reduction family.
+- While `surge_active = true`, the board should carry a persistent but low-duty warning treatment such as perimeter brackets, edge pulse, or corner rails; do not use a second full-width banner that competes with the phase banner.
+- Surge-start emphasis should happen once per surge start for a short burst, then settle into the quieter persistent state until the surge ends.
+- Orb-caused red-line reduction must read as a calming/cleaning event, not as a damage hit. Prefer a cool-toned sweep, soft collapse, or short-lived afterglow aligned to the affected segment over a bright warm flash.
+- The local reduction cue triggers only on real red-state improvement: `red 3 -> red 2`, `red 2 -> red 1`, or `red 1 -> blue`. No cue is emitted for no-op contact, blue-line travel, or green harvest events.
+- Green harvest keeps its own local `+coins` event language and must not be recolored to look like corruption reduction.
+- If both a phase-change banner and a surge start occur close together, the phase banner keeps the top-center slot and the surge start uses the perimeter/event layer instead of stacking another banner in the same lane.
+- If multiple adjacent red segments improve in the same update, each segment may emit its own local cue, but the effect should cap intensity and avoid turning the whole board into a white-noise flash.
+- Event feedback must stay readable at the minimum supported `1280 x 720` window and must not depend on inspecting the sidebar first.
+
+#### Procedures
+
+1. On surge start, create one short surge-start event using the board event layer.
+2. While `surge_active = true`, render the persistent surge treatment each frame using a low-duty pulse cycle anchored to the board perimeter or corners.
+3. On surge end, fade the persistent surge treatment out quickly rather than hard-cutting it off.
+4. When orb interaction commits a real red-state improvement, enqueue one local reduction event containing the affected segment, improvement magnitude, and expiration timing.
+5. Render local reduction events aligned to the segment geometry after the line-state update is visible, so the player sees `orb contact -> calmer segment -> state result` in one causal window.
+6. Remove expired local reduction and surge-start events automatically without changing underlying simulation state.
+
+#### Boundaries and Edge Cases
+
+- If a surge starts while a phase-transition banner is already active, keep the phase banner untouched and use only the surge event layer for the surge start.
+- If a surge ends during pause, the persistent warning treatment should remain frozen and then resolve correctly after resume; it must not restart from full intensity.
+- If a red segment is improved several times in rapid succession, refresh or stack the local reduction event only up to a capped brightness/width budget; do not let repeated hits create a blinding bar.
+- If a red segment improves at the outer edge of the board, the local reduction cue may bleed slightly past the segment for readability, but it must still read as originating from that segment rather than from the whole border.
+- If a harvest event and a red reduction event happen near each other, the harvest popup remains text/value-led while the red reduction cue remains a non-text cool clean/calm sweep.
+
+#### Outcomes
+
+- Players can tell the difference between `phase changed`, `surge active`, `surge just started`, and `this orb just calmed corruption here` without reading a text explanation first.
+- Board-side feedback feels authored and directional instead of relying on one generic flash language for every event.
+
+#### Data Requirements
+
+- `board_event_feedback_layer`
+- `surge_start_event_duration = 0.65 s`
+- `surge_persistent_pulse_cycle = 1.10 s`
+- `surge_end_fade_duration = 0.25 s`
+- `surge_feedback_anchor = board perimeter / corners`
+- `surge_feedback_profile = short activation stinger + persistent low-duty perimeter warning`
+- `corruption_reduction_event_duration = 0.30 s`
+- `corruption_reduction_afterglow_duration = 0.40 s`
+- `corruption_reduction_trigger = real red intensity drop or red-to-blue conversion only`
+- `corruption_reduction_feedback_profile = segment-aligned cool sweep + short calm afterglow`
+- `event_feedback_render_order = line state -> local board events -> orb trails / heads -> enemies -> phase banner / shell overlays`
+
+#### State Machine / Flow
+
+- States: `idle`, `surge_start_event`, `surge_persistent`, `surge_end_fade`, `local_reduction_event`
+- Entry triggers: surge start, surge active, surge end, real red-state improvement
+- Exit triggers: event duration elapsed, surge resolved, run paused/resumed, game over
+
+#### UI / UX Requirements
+
+- Surge-active feedback must be unmistakable at a glance but quieter than the one-time phase-transition banner.
+- The surge warning treatment should frame the board as under pressure rather than obscuring line readability in the center of the field.
+- Local corruption-reduction cues should feel cleaner and calmer immediately after orb contact, reinforcing relief rather than impact damage.
+- The board event layer should use the same technical visual language as the rest of the game: slim geometry, glow-driven accents, and purposeful motion instead of chunky arcade splashes.
+- Board-side event feedback must remain legible when the sidebar is ignored for a few seconds; the player should still understand the current danger and relief events from the playfield alone.
+
+#### Implementation Notes for Coder
+
+- Keep this as a presentation/event-layer pass in `gridline/app.py` or equivalent render surfaces; do not add new gameplay rules or new simulation mechanics.
+- Prefer lightweight event records keyed by segment or surge state over ad hoc one-frame flashes.
+- Reuse existing topology geometry so local reduction cues follow real segment orientation instead of using generic radial explosions.
+
+#### Open Questions
+
+- No open question for the current MVP pass: use perimeter-oriented surge warning and segment-aligned cool reduction cues as the implementation target.
+
 ### 7. Power Tower Event System
 
 #### System Name & Goal
@@ -1178,6 +1265,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 - Partial funding below 100 percent does not grant any active benefit.
 - Deployment is manual, not automatic.
 - Power tower duration is short and intended as a tactical answer to spikes.
+- Power tower is a supplemental mechanic and not a blocker for shell completion, board framing, escalation readability, or core three-tower usability work.
 - Power tower is cleaning-first, not pure damage-first.
 - Any hardpoint is a valid deployment target, including one that already hosts a permanent tower.
 - Deploying onto an occupied hardpoint does not delete the underlying tower; it suspends that tower's normal behavior until power mode expires.
@@ -1209,6 +1297,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 #### Outcomes
 
 - The system creates a controlled panic button and reward loop.
+- The core loop must still read as complete if this system remains present but only lightly tuned.
 
 #### Data Requirements
 
@@ -1221,6 +1310,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 - `active_clean_value`
 - `deployment_target_hardpoint_id`
 - `overridden_tower_snapshot`
+- `power_is_optional = true`
 
 #### State Machine / Flow
 
@@ -1239,7 +1329,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 
 #### Open Questions
 
-- Exact numeric power-state values remain open.
+- The starter power-state values in Section `17` are sufficient for the current MVP pass; deeper retuning is deferred and must not block core GUI/mechanics completion.
 
 ### 8. HUD, Telemetry, and Player Feedback
 
@@ -1266,6 +1356,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 - Build controls should appear only when an empty hardpoint is selected.
 - Tower-management controls should appear only when a tower is selected.
 - Power controls should be visually separated from both tower-build and tower-management controls.
+- Harvest-attribution feedback is part of the intended ship-facing readability stack, but it should stay compact: local `+coins` or equivalent near the affected line, one concise `Recent Harvest` status row, and selected-tower recent-income context only while that tower is selected.
 - `Esc` toggles the pause shell while a run is active; quitting the application or abandoning the run should happen from the shell, not from the live contextual action stack.
 - Fullscreen toggle support is required.
 - In the first playable MVP build, active orb count and recent shots fired remain visible by default rather than being hidden behind a debug-only view.
@@ -1342,6 +1433,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 - If one-column presentation cannot keep controls stationary and fully visible, a clean multi-column action region is preferred over a taller unstable single column.
 - Selecting an empty hardpoint should immediately surface the build choices without requiring the player to hunt for them below the fold.
 - Recent harvest gains should be legible as events, not only inferable from watching the total coin counter.
+- Compact harvest attribution should remain in the intended shipped HUD, but expanded per-tower economy detail should appear only contextually in the selected-object panel rather than as a permanent debug strip.
 - Live HUD, pause shell, and defeat shell should all look like the same command-console product through shared typography, panel language, and accent behavior.
 
 #### Implementation Notes for Coder
@@ -1352,7 +1444,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 
 #### Open Questions
 
-- Which telemetry items should remain in the shipping HUD versus debug-only HUD remains open.
+- `Recent Harvest` and local harvest popups are part of the intended shipped HUD. Broader orb/shot counters may remain lower-priority and can collapse later only if they materially compete with clearer command-surface presentation.
 
 ### 8A. Config-Agnostic Visual Readability and UX Robustness Pass
 
@@ -1383,6 +1475,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 - Empty-hardpoint build reachability remains a blocker even if future tuning adds more buttons, more tower variants, or larger cost numbers.
 - Control-panel stability matters as much as raw reachability; a technically reachable control stack that visibly jumps as labels change is not the intended finished behavior for this pass.
 - Any visual polish that becomes less readable when values grow or shrink sharply is invalid for this pass, even if it looks better under one tuning snapshot.
+- Harvest attribution should converge toward a compact layered cue stack rather than a debug dashboard: keep the local event popup, keep one concise recent-harvest line in status, and keep tower-specific attribution only in contextual selection details.
 
 #### Procedures
 
@@ -1457,7 +1550,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 
 #### Open Questions
 
-- Whether the final shipped HUD keeps all temporary attribution cues or collapses some into subtler effects remains open after readability validation.
+- No open question for the current MVP pass: keep compact attribution cues and collapse only the debug-like duplication. Ship the local harvest event cue plus concise recent-harvest status, while limiting tower-specific attribution text to selected-object context.
 
 ### 8B. Supported-Window Layout and Playfield Framing Pass
 
@@ -1484,7 +1577,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 - The supported-window solution should prefer denser grouped controls, shorter secondary text, and deliberate multi-column rows over increasing overall panel height.
 - The approved board boundary is the topology `playfield_rect`, not the full canvas width. Grid segments, intensity flashes, and other line-bound visuals must terminate at that boundary instead of implying extra columns on the right edge.
 - Hardpoints and temporary effects may visually overlap the board edge slightly for readability, but their anchors must remain on or inside the approved boundary so they do not read as extra board space.
-- If a board frame, vignette, or edge accent is added, it should reinforce where the playable field ends rather than decorate the empty canvas.
+- The approved board-edge treatment is a darker non-playable outer margin plus a subtle cool-toned inset outline aligned to `playfield_rect`; do not use a heavy decorative frame or full-canvas grid continuation.
 - Behavior below the declared support floor may degrade gracefully, but any reproduction at or above `1280 x 720` remains a real usability or presentation bug.
 
 #### Procedures
@@ -1520,7 +1613,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 - `active_group_first_row_visibility`
 - `supported_window_validation_cases = empty hardpoint, occupied basic tower, occupied seed tower, active power state`
 - `board_boundary_rect = topology.playfield_rect`
-- `board_boundary_visual_treatment`
+- `board_boundary_visual_treatment = darker outer margin + subtle inset outline`
 - `line_visual_clip_policy`
 
 #### State Machine / Flow
@@ -1545,7 +1638,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 
 #### Open Questions
 
-- Whether the final board frame should use a subtle outline, a darker margin treatment, or no extra frame beyond clean line termination remains open as long as the boundary reads clearly.
+- No open question for the current MVP pass: use the approved darker outer margin plus subtle inset outline treatment. Revisit only if later visual polish proves that cleaner termination alone reads better without losing boundary clarity.
 
 ### 8C. Run-State Shell and Session Flow
 
@@ -1571,6 +1664,8 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 - The `defeat_summary` shell appears automatically when the loss condition resolves and replaces pause controls with post-run summary plus next actions.
 - `Replay` must be the primary post-defeat action and should start a fresh run immediately from the same config without extra confirmation unless the Planner later adds a destructive-profile concern.
 - `Quit` and other low-frequency session actions belong to shell surfaces such as `title_ready`, `paused`, or `defeat_summary`; they do not belong in the main contextual action stack.
+- The `title_ready` shell should use a dimmed live-board preview as background context rather than a fully opaque menu screen or unrelated splash art.
+- The ready-shell background treatment should preserve board identity while clearly reading as pre-run: darken/desaturate the board preview slightly, keep the command-rail shell surfaces crisp above it, and avoid busy overlays that compete with the primary `Start Run` action.
 - MVP shell scope is intentionally lean: no save system, no metaprogression, no branching campaign menus, and no settings labyrinth beyond the required display/session actions.
 
 #### Procedures
@@ -1604,7 +1699,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 - `pause_freezes_simulation = true`
 - `defeat_summary_fields = run_duration, cause_of_loss, highest_phase_reached, corruption_percent_at_loss, highest_power_funding, power_deploy_count`
 - `shell_transition_duration`
-- `shell_background_treatment`
+- `shell_background_treatment = dimmed live-board preview + command-surface scrim`
 
 #### State Machine / Flow
 
@@ -1615,10 +1710,12 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 #### UI / UX Requirements
 
 - The title/ready shell should establish the game's command-console tone quickly without becoming a separate feature-heavy front end.
+- The ready shell should show the board as a subdued preview surface behind the command rail so the player immediately reads the product as a live tactical board awaiting activation, not as a disconnected menu scene.
 - The pause shell should foreground the immediate decision to resume, restart, or quit while leaving the frozen board visible enough that the player retains situational context.
 - The defeat shell must explain the loss in the same visual language as the live HUD and should emphasize the next action rather than trapping the player in a static summary page.
 - Summary emphasis order should be: `Cause of loss`, `Run duration`, `Highest phase reached`, `Corruption at loss`, `Power usage`, then optional secondary stats.
 - Shell typography, headers, badges, and accent colors should reuse the same visual system as the command rail so the transition between live play and overlays feels intentional and continuous.
+- The shell scrim should quiet the background board enough that `Start Run`, `Resume`, and `Replay` remain the obvious primary controls at the support floor without hiding the board completely.
 
 #### Implementation Notes for Coder
 
@@ -1628,7 +1725,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 
 #### Open Questions
 
-- Whether the title/ready shell uses a static background board, a low-motion live preview, or a frozen sample board remains open as long as it stays visually lightweight.
+- No open question for the current MVP pass: the ready shell uses a dimmed frozen or near-static live-board preview plus a command-surface scrim. Avoid unrelated splash art and avoid a busy animated attract mode.
 
 ## Known Inputs Already Agreed
 
@@ -1693,7 +1790,11 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 
 - `background_color = #081018`
 - `playfield_overlay_color = #0B1622`
+- `board_margin_color = #061019`
+- `board_frame_color = #163247`
 - `sidebar_color = #0F1726`
+- `shell_scrim_color = rgba(6, 12, 18, 0.62)`
+- `shell_preview_dim_alpha = 0.38`
 - `neutral_large_color = #7FC7FF`
 - `neutral_medium_color = #4EA0D8`
 - `neutral_small_color = #2A5978`
@@ -1709,6 +1810,10 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 - `enemy_striker_color = #FFC16B`
 - `warning_color = #FFCC4D`
 - `critical_color = #FF5A5A`
+- `surge_edge_color = #F2C46D`
+- `surge_stinger_color = #FFD36A`
+- `corruption_reduction_color = #8EE6FF`
+- `corruption_reduction_afterglow = #4FC6D8`
 - `large_line_width = 2.5 px`
 - `medium_line_width = 1.5 px`
 - `small_line_width = 1.0 px`
@@ -1721,6 +1826,9 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 - `hardpoint_radius = 8 px`
 - `enemy_radius = 6 px`
 - `sidebar_width = 320 px`
+- `surge_start_stroke_width = 4 px`
+- `surge_persistent_stroke_width = 2 px`
+- `corruption_reduction_stroke_width = 3 px`
 
 #### UI / UX Requirements
 
@@ -2025,6 +2133,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 
 - The power tower should feel immediately superior at stabilization, not subtle.
 - It should still be destructible if committed too early or onto a collapsing flank.
+- These values are provisional starter defaults for an optional supplemental mechanic; preserving clear funding, readiness, and deploy behavior matters more than reopening deep power retuning during current core-completion work.
 
 ### 18. UI Layout Constants
 
@@ -2128,28 +2237,29 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 
 #### System Name & Goal
 
-- Goal: turn the first stable MVP build into a playtest-ready build by tuning pacing, economy pressure, tower-role clarity, secondary-mode tradeoffs, power-tower usage, and high-value readability/usability polish without adding new major systems.
+- Goal: define the post-core evaluation lane for pacing, economy pressure, role clarity, and optional power-tower behavior after the command-surface, shell, and core-mechanics presentation work is in a stable finished state.
 
 #### Core Mechanics
 
 1. Treat the MVP starter constants as the baseline and modify only existing values, timings, thresholds, targeting weights, UI grouping, label clarity, and feedback strength during this pass.
-2. Focus this pass on pacing, economy pressure, role separation, secondary-mode tradeoffs, power-tower timing/value, and readability/usability polish.
+2. Focus this pass on pacing, economy pressure, role separation, secondary-mode tradeoffs, and only the optional power-tower timing/value work that remains after core presentation and shell completion.
 3. The allowed levers for this pass are existing pacing, economy, power-funding, targeting, and presentation parameters rather than new mechanics or new content classes.
 4. Defer any problem that appears to require a new mechanic, new content class, or structural expansion back to Planner instead of growing scope inside this pass.
-5. Practical power-tower reachability, meaningful mode tradeoffs, and longer-session role judgment should all be possible before the pass is considered complete.
+5. Broader Section 20 evaluation begins only after the current GUI, shell, and readability completion work is stable enough that failures can be attributed to tuning rather than presentation drift.
 
 #### Rules
 
 - No new enemy classes, bosses, tower archetypes, progression layers, currencies, or meta systems may be added in this pass.
 - Broader balance-first test cycles should not take priority over missing run-state shell work, escalation-landmark signaling, or command-surface readability work already approved elsewhere in this document.
+- Broader Section 20 pacing and power-tower retuning is explicitly off the current MVP critical path until Planner reopens it; `BUG-023` remains deferred while shell, framing, escalation readability, and core tower presentation are completed.
 - Do not flatten archetype identity just to hit survival-time targets; role separation is a required outcome, not optional polish.
 - Prefer incremental tuning passes over broad multi-system rewrites so playtest results remain attributable.
 - Readability/usability work is in scope only when it materially improves decision speed, feedback clarity, or control reachability during live play.
 - If a tuning change would alter the game's core fantasy or loop, stop and escalate to Planner.
-- Tuning passes should focus on existing-system levers that affect practical power reachability and broader run extension: harvest income, build and upgrade costs, shot costs, spawn/corruption pacing, power-funding chunk cost, and other current power-funding timing/value levers already present in the approved systems.
-- A competent mixed or power-leaning line should be able to reach at least one meaningful charge or deploy decision before loss; if power never reaches 100 percent, the batch has not met its primary goal.
+- When Section 20 work is active, tuning passes should focus on existing-system levers that affect practical power reachability and broader run extension: harvest income, build and upgrade costs, shot costs, spawn/corruption pacing, power-funding chunk cost, and other current timing/value levers already present in the approved systems.
+- During current core-completion work, preserve clear funding, deploy, and readiness behavior and non-dominant power usage, but do not treat repeated power deploy viability as a blocker.
 - If a new best line becomes rushing power funding so hard that permanent tower development stops mattering, the power tower has become overtuned.
-- If runs extend slightly but still never reach a realistic charge or deploy point, the batch is incomplete even if secondary modes remain reachable.
+- If runs extend slightly but still never reach a realistic charge or deploy point during a later reopened Section 20 pass, that later batch is incomplete even if secondary modes remain reachable.
 - Explicitly defer a green-seeding ally, default medium-grid `Seed Tower` travel, and non-blocking seed-launch-path presentation changes unless Planner reopens scope.
 - In informed non-throw play, most losses should land inside the 10 to 15 minute target band.
 - Repeated losses before minute 5 indicate the opener is too punishing unless the player is obviously leaving hardpoints idle or refusing affordable actions.
@@ -2173,7 +2283,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 
 1. Evaluate competent styles such as secondary-first, mixed-then-power, and direct power-rush.
 2. For each session, record at minimum: `run_duration`, `cause_of_loss`, `first_secondary_activation_time`, `first_power_funding_purchase_time`, `highest_power_funding_reached`, `charge_stored`, and `power_deploy_count`.
-3. Treat a tuning pass as successful only if competent runs can reach at least one meaningful power charge or deploy decision while entering a longer decision window for role separation and late-use judgment.
+3. Treat a reopened tuning pass as successful only if competent runs can reach at least one meaningful power charge or deploy decision while entering a longer decision window for role separation and late-use judgment.
 4. Adjust the smallest allowed existing-system lever first: economy values, pacing/pressure timings, or power-funding values.
 5. Re-run the same power-reachability and role-separation lines after each tuning batch before reopening deferred scope ideas.
 6. If a fix only works by proposing new mechanics or content classes, defer it back to Planner instead of implementing around the gap.
@@ -2182,6 +2292,7 @@ where `max_red_intensity_level = 3`, only red segments contribute to the numerat
 
 - A longer run is not automatically a better run; if time-to-loss improves because one tower or mode crowds out the others, the pass has failed role-separation goals.
 - A readable but trivial board state is still a failure; readability improvements should support better decisions, not replace pressure.
+- If a current task is about shell clarity, board framing, action reachability, or line-readability feedback, solve that directly without reopening the deferred Section 20 power-tower balance lane.
 - If economy forgiveness causes shot cost or build order to stop mattering by mid-run, restore pressure before adding more generosity.
 - If a build survives longer only because it front-loads one clearly dominant power-rush path, keep tuning until there is real early decision space again.
 - If a run can technically charge power only by abandoning basic expansion and then dies before deployment can matter, power reachability is still failing in practice.

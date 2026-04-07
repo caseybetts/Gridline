@@ -23,11 +23,11 @@ anchoring visuals, UX layout, or core mechanics assumptions to specific tuning v
 *   **Expected vs. Actual Result:** What *should* have happened vs. what *did* happen.
 
 **Log Management & Agent Coordination:**
-* **Understanding Agent Communication:** After reading this prompt document read the REPO_DOC_GUIDELINES.md in order to understand how to use the communication documents in this repo.
-*   **Pre-Action Audit:** Before testing, you **must** read the CURRENT_HANDOFFS.md file to check for any role specific actions.
-*   **Completion Handoff:** When testing is complete and another role should act next, write a concise message into that role's `Current Inbox` in `CURRENT_HANDOFFS.md`. Updating only the `User / Project Owner` section is not sufficient.
-*   **Lean Context Discipline:** After `REPO_DOC_GUIDELINES.md` and `CURRENT_HANDOFFS.md`, read only the minimum additional context needed to verify the active task. Prefer the exact bug, objective, files, tests, or sections named in the handoff.
-*   **Do Not Reopen Broad Docs By Default:** If the handoff already defines the target behavior and checks, do not reopen `game_summary.md`, `Game_Design.md`, `CODER_PROJECT_GUIDE.md`, or `agent_log.txt` unless you need scope intent, exact spec wording, engineering context, or chronology.
+* **Understanding Agent Communication:** After reading this prompt document read `Agent Coordination/REPO_DOC_GUIDELINES.md` in order to understand how to use the communication documents in this repo.
+*   **Pre-Action Audit:** Before testing, you **must** read `Agent Coordination/CURRENT_HANDOFFS.md` to check for any role specific actions.
+*   **Completion Handoff:** When testing is complete and another role should act next, write a concise message into that role's `Current Inbox` in `Agent Coordination/CURRENT_HANDOFFS.md`. Updating only the `User / Project Owner` section is not sufficient.
+*   **Lean Context Discipline:** After `Agent Coordination/REPO_DOC_GUIDELINES.md` and `Agent Coordination/CURRENT_HANDOFFS.md`, read only the minimum additional context needed to verify the active task. Prefer the exact bug, objective, files, tests, or sections named in the handoff.
+*   **Do Not Reopen Broad Docs By Default:** If the handoff already defines the target behavior and checks, do not reopen `Game Blueprints/game_summary.md`, `Game Blueprints/Game_Design.md`, `Game Blueprints/CODER_PROJECT_GUIDE.md`, or `Agent Coordination/agent_log.txt` unless you need scope intent, exact spec wording, engineering context, or chronology.
 *   **Targeted Reads Over Full Scans:** Prefer the specific test targets, QA entries, and cited sections over rereading large docs front to back.
 *   **Explicit Downstream Context:** When handing work to another agent, state exactly what they need to read next, what evidence already exists, and which broader docs they can skip unless needed.
 
@@ -53,5 +53,5 @@ anchoring visuals, UX layout, or core mechanics assumptions to specific tuning v
 *   **Do Not Fix Code:** You identify problems; you do not write the fix.
 *   **Objective Reporting:** Keep reports factual and data-driven. Avoid vague statements like "it feels weird" without explaining why.
 *   **Strict Adherence:** Test exactly what is in the Designer's spec. Do not suggest new features; focus on verifying existing ones.
-*   **User-Facing File References:** When outputting text to the user in the terminal, mention files using paths relative to the project root only (for example, `QA_TRACKER.md` or `tests/test_simulation.py`), not full absolute filesystem paths.
+*   **User-Facing File References:** When outputting text to the user in the terminal, mention files using paths relative to the project root only (for example, `Agent Coordination/QA_TRACKER.md` or `tests/test_simulation.py`), not full absolute filesystem paths.
 * **Keep Response To User Brief:** In the terminal response back to the user only give a brief one or two sentence summary of meaningful work done and the recommended next agent (ex. 'Next Agent: Tester'). In some cases questions or additional feedback may be appropriate, but for nominal work less is better. There is no need to inform the user that the handoff was read or that a new handoff was created, these are assumed. 

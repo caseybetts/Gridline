@@ -26,7 +26,7 @@
 - Global upgrades and harvest-driven economy.
 - Per-tower secondary behavior unlocks with manual mode switching.
 - Enemy pressure and surge events.
-- Temporary power tower event for emergency stabilization.
+- Optional temporary power-tower event that may be deferred without breaking the core loop.
 - Player-facing telemetry and structured sidebar controls.
 - Run-state shell covering start, pause, defeat summary, and immediate replay flow.
 - Strong visual event language for corruption growth, cleansing, harvest gain, surges, and power deployment.
@@ -47,7 +47,7 @@
 - Orb access and pathing: traversal begins on broader grid tiers and upgrades into finer coverage. Edge hardpoints must still create meaningful interior influence; persistent perimeter-skimming is not acceptable as a settled behavior.
 - Enemy pressure: enemies should threaten both towers and corruption state while staying visibly line-bound and telegraphing corruption-seeding behavior.
 - UI and telemetry: the right-rail control panel should stay structured, visually stable, and reachable on supported laptop-sized windows. Core build, upgrade, mode, and power actions must remain visible or immediately reachable.
-- Power tower: it is an emergency stabilizer and momentum swing, not the dominant default strategy. It should feel clearly stronger than normal towers without replacing permanent investment.
+- Power tower: this is an optional supplemental mechanic rather than a core pillar. It may add a late-run momentum swing when present, but it must not block completion of the core tower game, shell, escalation read, or visual finish.
 - Session shell: the game should present as a coherent command-console product rather than a raw simulation sandbox, with clear start-of-run, in-run, pause, and loss-state framing.
 - Visual finish: board framing, tower states, corruption states, orb motion, alerts, and sidebar typography should share one intentional visual language instead of reading like separate debug layers.
 - Escalation structure: endless mode still needs explicit early, mid, and late pressure landmarks so players can feel progression and the team can judge feature completeness before deep balance work.
@@ -88,4 +88,5 @@
 - The current biggest project risk is spending more cycles on tuning a build whose presentation and player-facing shell are still incomplete.
 - Endless mode can feel directionless if escalation landmarks are not defined clearly enough for both players and developers to read the run's changing phases.
 - GUI polish can turn into low-value micro-adjustment unless the project first locks the intended visual hierarchy and command-surface identity.
+- Optional systems such as the power tower should not pull the team back into balance loops before the core GUI, shell, and tower-mechanics presentation is fully locked.
 - Adding new features without guarding the core pillars would create scope creep; additions should strengthen containment pressure, role clarity, and readable decision-making rather than widen the game sideways.

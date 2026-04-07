@@ -1,0 +1,22 @@
+Entry format:
+- use one plain-text line per entry in this exact order:
+  `[Timestamp][Agent][Change Made][Refs]`
+- keep `Change Made` to one short sentence
+- keep `Refs` compact, for example `[BUG-014, OBJ-013]` or `[]` if none apply
+
+Entries:
+[2026-04-03T20:10:34.7642489-06:00][Planner][Added Reviewer_Prompt.md so risky coder batches can route through a diff-focused review gate before Tester when needed.][]
+[2026-04-03T20:17:10.7298684-06:00][Coder][Fixed BUG-022 by shrinking ready-shell status allocation and preserving visible startup utility space so the Start Run control remains reachable at default 1280x720 while the full pytest suite stays green.][BUG-022, FEATURE-RAIL-001]
+[2026-04-03T21:42:05.5420206-06:00][Tester][Verified BUG-022 fixed with focused startup, shell, phase, and reachability retests at the default 1280x720 launch size.][BUG-022]
+[2026-04-04T11:52:29.4513307-06:00][Tester][Reopened the Section 20 balance lane as BUG-023 after long-horizon seeded probes showed over-band survival and repeat power-deploy loops.][BUG-023, OBJ-013, OBJ-014]
+[2026-04-04T12:00:32.5528547-06:00][Planner][Triaged reopened BUG-023 and routed a bounded Section 20 retune directly to Coder using the existing Section 20 guard tests and long-horizon probes.][BUG-023, OBJ-013, OBJ-014]
+[2026-04-04T12:32:06.0181513-06:00][Planner][Reclassified the power tower as optional/non-core in `game_summary.md`, deferred BUG-023 from the MVP path, and redirected the next handoff to Designer for design-doc completion and GUI/mechanics focus.][BUG-023]
+[2026-04-04T13:28:04.2555158-06:00][Designer][Completed the `Game_Design.md` GUI/mechanics spec pass, locked compact attribution plus board/shell presentation direction, and handed the next implementation slice to Coder without reopening deferred power retuning.][BUG-023]
+[2026-04-04T14:15:03.3482653-06:00][Designer][Replaced the stale generic brief with a focused implementation brief for the active GUI/presentation slice and pointed the Coder handoff at it.][BUG-023]
+[2026-04-04T14:20:18.7978529-06:00][Coder][Implemented `FEATURE-RAIL-002` in `gridline/app.py`, compacting harvest status text while refining board framing and ready-shell board-preview scrim with focused UI regressions passing.][FEATURE-RAIL-002]
+[2026-04-04T15:40:49.8411735-06:00][Planner][Accepted the recent GUI presentation decisions into `Game_Design.md` and updated the live board so Planner now waits on Tester verification of FEATURE-RAIL-002 before choosing the next GUI/mechanics slice.][FEATURE-RAIL-002, BUG-023]
+[2026-04-04T16:06:12.2105320-06:00][Coder][Fixed the supported-window action-region regression so occupied tower selections surface visible tower controls at `1280x720`, then updated focused GUI tests and rerouted verification to Tester.][FEATURE-RAIL-002]
+[2026-04-04T16:10:36.9613407-06:00][Tester][Verified the `FEATURE-RAIL-002` action-region fix at `1280x720` with focused GUI regressions and a direct occupied-selection geometry probe.][FEATURE-RAIL-002]
+[2026-04-04T16:20:35.7823806-06:00][Planner][Reviewed the verified `FEATURE-RAIL-002` pass, tightened stale implementation-open-question wording in `Game_Design.md`, and routed the next bounded GUI/mechanics slice to Designer for board-feedback signaling spec work.][FEATURE-RAIL-002]
+[2026-04-04T16:23:47.4526326-06:00][Designer][Added `6B. Board Event Feedback Layer` plus supporting visual constants to `Game Blueprints/Game_Design.md` and handed the next bounded board-feedback implementation slice to Coder.][FEATURE-RAIL-002]
+[2026-04-04T16:30:12.8261887-06:00][Coder][Implemented the bounded board-event feedback slice in `gridline/app.py`, adding perimeter surge signaling and segment-aligned clean cues with focused event-layer regressions passing.][FEATURE-RAIL-002]

@@ -22,11 +22,11 @@ anchoring visuals, UX layout, or core mechanics assumptions to specific tuning v
 *   **Review Outcome:** State one clear outcome such as `changes requested`, `ready for Tester`, or `ready for Planner/Designer clarification`.
 
 **Log Management & Agent Coordination:**
-* **Understanding Agent Communication:** After reading this prompt document read the REPO_DOC_GUIDELINES.md in order to understand how to use the communication documents in this repo.
-*   **Pre-Action Audit:** Before reviewing, you **must** read the `CURRENT_HANDOFFS.md` file to check for any role specific actions.
-*   **Completion Handoff:** When review is complete and another role should act next, write a concise message into that role's `Current Inbox` in `CURRENT_HANDOFFS.md`. Updating only the `User / Project Owner` section is not sufficient.
-*   **Lean Context Discipline:** After `REPO_DOC_GUIDELINES.md` and `CURRENT_HANDOFFS.md`, read only the minimum additional context needed for the active review. Prefer the exact files, tests, briefs, or sections named in the handoff.
-*   **Do Not Reopen Broad Docs By Default:** If the handoff already scopes the change, do not reopen `game_summary.md`, `Game_Design.md`, `CODER_PROJECT_GUIDE.md`, `QA_TRACKER.md`, or `agent_log.txt` unless you need product intent, exact spec wording, engineering context, verification criteria, or chronology.
+* **Understanding Agent Communication:** After reading this prompt document read `Agent Coordination/REPO_DOC_GUIDELINES.md` in order to understand how to use the communication documents in this repo.
+*   **Pre-Action Audit:** Before reviewing, you **must** read `Agent Coordination/CURRENT_HANDOFFS.md` to check for any role specific actions.
+*   **Completion Handoff:** When review is complete and another role should act next, write a concise message into that role's `Current Inbox` in `Agent Coordination/CURRENT_HANDOFFS.md`. Updating only the `User / Project Owner` section is not sufficient.
+*   **Lean Context Discipline:** After `Agent Coordination/REPO_DOC_GUIDELINES.md` and `Agent Coordination/CURRENT_HANDOFFS.md`, read only the minimum additional context needed for the active review. Prefer the exact files, tests, briefs, or sections named in the handoff.
+*   **Do Not Reopen Broad Docs By Default:** If the handoff already scopes the change, do not reopen `Game Blueprints/game_summary.md`, `Game Blueprints/Game_Design.md`, `Game Blueprints/CODER_PROJECT_GUIDE.md`, `Agent Coordination/QA_TRACKER.md`, or `Agent Coordination/agent_log.txt` unless you need product intent, exact spec wording, engineering context, verification criteria, or chronology.
 *   **Targeted Reads Over Full Scans:** Prefer diff-based review, exact file slices, and cited spec/test excerpts over rereading large documents front to back.
 *   **Explicit Downstream Context:** When handing work to another agent, state exactly what they need to read next, what risk was found or cleared, and which broader docs they can skip unless needed.
 

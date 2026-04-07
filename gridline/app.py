@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gc
 from dataclasses import replace
+import math
 import re
 import tkinter as tk
 
@@ -239,6 +240,7 @@ class GridlineApp:
         self.highest_power_funding = self.sim.power.funding_percent
         self.power_deploy_count = 0
         self.defeat_summary: dict[str, object] = {}
+        self._reset_board_event_feedback()
         self._queue_sidebar_rebalance()
         self._render()
         self._refresh_sidebar()
@@ -562,24 +564,39 @@ class GridlineApp:
 
     def _rebalance_sidebar_layout(self) -> None:
         self._sidebar_rebalance_after_id = None
+        shell_state = getattr(self, "shell_state", "title_ready")
         sidebar_height = self.sidebar.winfo_height()
         if sidebar_height <= 1:
             return
         title_height = max(self.title_label.winfo_height(), self.title_label.winfo_reqheight())
         status_height = max(self.status_frame.winfo_height(), self.status_frame.winfo_reqheight())
-        utility_height = max(self.utility_frame.winfo_height(), self.utility_frame.winfo_reqheight())
-        fixed_height = title_height + status_height + utility_height + 72
+        utility_height = 0
+        if self.utility_frame.winfo_manager():
+            utility_height = max(self.utility_frame.winfo_height(), self.utility_frame.winfo_reqheight())
+        fixed_height = title_height + status_height + utility_height + 56
         remaining = max(180, sidebar_height - fixed_height)
-        action_floor = 208
-        detail_min = 104
-        detail_max = 220
-        detail_height = min(detail_max, max(detail_min, remaining - action_floor))
-        if remaining < detail_min + action_floor:
-            detail_height = max(84, remaining - action_floor)
-        action_height = max(156, remaining - detail_height)
+        if shell_state == "active_run":
+            action_floor = 260
+            min_action_height = 220
+            detail_floor = 48
+            detail_min = 72
+            detail_max = 104
+        else:
+            action_floor = 208
+            min_action_height = 156
+            detail_floor = 72
+            detail_min = 104
+            detail_max = 220
+        detail_req = self.detail_inner.winfo_reqheight() + 28
+        detail_height = min(detail_max, max(detail_min, min(detail_req, remaining - action_floor)))
+        action_height = remaining - detail_height
+        if action_height < min_action_height:
+            detail_height = max(detail_floor, remaining - min_action_height)
+            action_height = remaining - detail_height
         self.details_frame.configure(height=detail_height)
-        self.detail_canvas.configure(height=max(72, detail_height - 24))
-        self.action_canvas.configure(height=action_height)
+        self.detail_canvas.configure(height=max(36, detail_height - 24))
+        min_canvas_height = 140 if shell_state == "active_run" else 156
+        self.action_canvas.configure(height=max(min_canvas_height, action_height))
 
     def _toggle_fullscreen(self, _event=None) -> None:
         if not self.spec.fullscreen_toggle_enabled:
@@ -601,6 +618,7 @@ class GridlineApp:
         self.highest_power_funding = self.sim.power.funding_percent
         self.power_deploy_count = 0
         self.defeat_summary = {}
+        self._reset_board_event_feedback()
         self.feedback_text.set("")
         self._last_action_selection_signature = None
         self._last_detail_selection_signature = None
@@ -720,8 +738,11 @@ class GridlineApp:
             self.loop_running = False
             return
         previous_active_power = self.sim.power.active_hardpoint_id
+        previous_surge_active = self.sim.surge_time_remaining > 0
+        previous_clean_impacts = self._current_clean_impact_snapshot()
         self.sim.update(self.sim_dt)
         self._track_run_metrics(previous_active_power)
+        self._update_board_event_feedback(self.sim_dt, previous_surge_active, previous_clean_impacts)
         if self.sim.game_over:
             self._transition_to_defeat()
             return
@@ -736,6 +757,56 @@ class GridlineApp:
         self.highest_power_funding = max(self.highest_power_funding, self.sim.power.funding_percent)
         if previous_active_power is None and self.sim.power.active_hardpoint_id is not None:
             self.power_deploy_count += 1
+
+    def _reset_board_event_feedback(self) -> None:
+        self._surge_start_time_remaining = 0.0
+        self._surge_end_fade_time_remaining = 0.0
+        self._surge_pulse_elapsed = 0.0
+        self._clean_feedback_events: dict[str, dict[str, float]] = {}
+
+    def _current_clean_impact_snapshot(self) -> dict[str, float]:
+        return {
+            segment_id: impact.time_remaining
+            for segment_id, impact in self.sim.segment_impacts.items()
+            if impact.effect == "clean"
+        }
+
+    def _update_board_event_feedback(
+        self,
+        dt: float,
+        previous_surge_active: bool,
+        previous_clean_impacts: dict[str, float],
+    ) -> None:
+        surge_active = self.sim.surge_time_remaining > 0
+        self._surge_pulse_elapsed = (self._surge_pulse_elapsed + dt) % 1.10
+        if surge_active and not previous_surge_active:
+            self._surge_start_time_remaining = 0.65
+            self._surge_end_fade_time_remaining = 0.0
+        elif previous_surge_active and not surge_active:
+            self._surge_end_fade_time_remaining = 0.25
+        if self._surge_start_time_remaining > 0:
+            self._surge_start_time_remaining = max(0.0, self._surge_start_time_remaining - dt)
+        if not surge_active and self._surge_end_fade_time_remaining > 0:
+            self._surge_end_fade_time_remaining = max(0.0, self._surge_end_fade_time_remaining - dt)
+
+        current_clean_impacts = self._current_clean_impact_snapshot()
+        for segment_id, time_remaining in current_clean_impacts.items():
+            previous_time = previous_clean_impacts.get(segment_id)
+            if previous_time is None or time_remaining > previous_time + 1e-6:
+                state = self.sim.segment_states[segment_id]
+                self._clean_feedback_events[segment_id] = {
+                    "sweep": 0.30,
+                    "afterglow": 0.40,
+                    "strength": 1.0 if state.color == "blue" else 0.8,
+                }
+        for segment_id in list(self._clean_feedback_events):
+            event = self._clean_feedback_events[segment_id]
+            if event["sweep"] > 0:
+                event["sweep"] = max(0.0, event["sweep"] - dt)
+            elif event["afterglow"] > 0:
+                event["afterglow"] = max(0.0, event["afterglow"] - dt)
+            else:
+                self._clean_feedback_events.pop(segment_id, None)
 
     def _refresh_sidebar(self) -> None:
         hud = self.sim.hud_snapshot()
@@ -752,8 +823,7 @@ class GridlineApp:
             ("corruption", f"Corruption: {self._meter_bar(hud['corruption_percent'], hud['failure_threshold'])} {hud['corruption_percent']:.1f}% / {hud['failure_threshold']:.0f}%"),
             ("coins", f"Coins: {hud['coins']}"),
             ("power", f"Power: {self._power_status_text(hud)}"),
-            ("level", f"Level: {hud['level']}  Next: {hud['level_time_remaining']:.1f}s"),
-            ("telemetry", f"Orbs: {hud['active_orb_count']}  Shots/s: {hud['shots_recent']}"),
+            ("level", f"Level: {hud['level']}  Next: {hud['level_time_remaining']:.1f}s  Orbs: {hud['active_orb_count']}  Shots/s: {hud['shots_recent']}"),
             ("harvest", f"Harvest: {self._recent_harvest_text(recent_harvest)}"),
             ("surge", f"Surge: {'ACTIVE' if hud['surge_active'] else 'idle'}"),
             ("status", status_line),
@@ -846,11 +916,16 @@ class GridlineApp:
         danger_keys = set()
         visible_by_state = {
             "title_ready": {"pressure", "phase", "corruption", "coins", "power", "status"},
-            "active_run": set(self.status_row_order),
+            "active_run": {"pressure", "phase", "corruption", "coins", "power", "level"},
             "paused": {"pressure", "phase", "corruption", "power", "level", "surge", "status"},
             "defeat_summary": {"pressure", "phase", "corruption", "power", "status"},
         }
-        visible_keys = visible_by_state[self.shell_state]
+        visible_keys = set(visible_by_state[self.shell_state])
+        if self.shell_state == "active_run":
+            if hud["recent_harvest_event"] is not None:
+                visible_keys.add("harvest")
+            if hud["surge_active"]:
+                visible_keys.add("surge")
         if "[CRITICAL]" in self._pressure_badge(hud) or hud["game_over"]:
             danger_keys.update({"pressure", "corruption"})
         if hud["surge_active"]:
@@ -889,22 +964,26 @@ class GridlineApp:
     def _update_button_states(self, selected: dict[str, object], availability: dict[str, tuple[bool, str]]) -> None:
         context = selected.get("kind", "none")
         self._update_context_action_labels(selected, availability)
+        self._sync_utility_region()
         if self.shell_state != "active_run":
+            self._set_visible_action_groups(())
             for header in self.action_group_headers.values():
                 header.configure(fg=self.spec.visuals.muted_text)
             for button in self.action_buttons.values():
                 button.configure(state=tk.DISABLED)
             return
         tower = selected.get("tower")
-        active_groups = {"power"}
+        active_groups: tuple[str, ...] = ("power",)
         if context in {"none", "empty"}:
-            active_groups.add("build")
+            active_groups = ("build", "power")
         elif context == "tower":
-            active_groups.add("tower")
+            active_groups = ("tower", "power")
             if tower is not None and tower.archetype == "seed_tower":
-                active_groups.add("seed")
+                active_groups = ("tower", "seed", "power")
         elif context == "power":
-            active_groups.add("power")
+            active_groups = ("power",)
+
+        self._set_visible_action_groups(active_groups)
 
         for group_key, header in self.action_group_headers.items():
             header.configure(fg=self.spec.visuals.text if group_key in active_groups else self.spec.visuals.muted_text)
@@ -930,6 +1009,21 @@ class GridlineApp:
                 self._style_shell_button(button, is_primary=key == primary_key)
             elif button.winfo_manager():
                 button.pack_forget()
+
+    def _sync_utility_region(self) -> None:
+        if self.shell_state == "active_run":
+            if self.utility_frame.winfo_manager():
+                self.utility_frame.pack_forget()
+            return
+        if self.utility_frame.winfo_manager() != "pack":
+            self.utility_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=16, pady=(0, 16))
+
+    def _set_visible_action_groups(self, visible_groups: tuple[str, ...]) -> None:
+        for group_frame in self.action_groups.values():
+            if group_frame.winfo_manager():
+                group_frame.pack_forget()
+        for group_key in visible_groups:
+            self.action_groups[group_key].pack(fill=tk.X, pady=(0, 10))
 
     def _style_shell_button(self, button: tk.Button, is_primary: bool) -> None:
         if is_primary:
@@ -986,8 +1080,8 @@ class GridlineApp:
         if recent_harvest is None:
             return "no recent income"
         return (
-            f"+{recent_harvest['amount']}c via {recent_harvest['tower_name']} / "
-            f"{recent_harvest['mode_name']} ({recent_harvest['age']:.1f}s)"
+            f"+{recent_harvest['amount']}c | {recent_harvest['tower_name']} | "
+            f"{recent_harvest['mode_name']} | {recent_harvest['age']:.1f}s ago"
         )
 
     def _maybe_reset_sidebar_scrolls(self, selected: dict[str, object]) -> None:
@@ -1109,6 +1203,8 @@ class GridlineApp:
                 "secondary_actions": ("Quit", "F11 Fullscreen"),
                 "accent": "#8BD3FF",
                 "panel_fill": "#09131E",
+                "scrim_fill": "#07111A",
+                "scrim_stipple": "gray50",
             },
             "paused": {
                 "badge": "PAUSE SHELL",
@@ -1119,6 +1215,8 @@ class GridlineApp:
                 "secondary_actions": ("Replay", "Quit", "Esc Resume", "F11 Fullscreen"),
                 "accent": "#F2C46D",
                 "panel_fill": "#09131E",
+                "scrim_fill": "#02060A",
+                "scrim_stipple": "gray25",
             },
             "defeat_summary": {
                 "badge": "DEFEAT SHELL",
@@ -1129,6 +1227,8 @@ class GridlineApp:
                 "secondary_actions": ("Quit", "F11 Fullscreen"),
                 "accent": self.spec.visuals.critical,
                 "panel_fill": "#110B10",
+                "scrim_fill": "#02060A",
+                "scrim_stipple": "gray25",
             },
         }[self.shell_state]
 
@@ -1169,18 +1269,31 @@ class GridlineApp:
         self.canvas.delete("all")
         canvas_width = self.canvas.winfo_width()
         canvas_height = self.canvas.winfo_height()
-        self.canvas.create_rectangle(0, 0, canvas_width, canvas_height, fill=self.spec.visuals.background, outline="")
+        outer_margin_fill = blend_hex(self.spec.visuals.background, "#010306", 0.62)
+        self.canvas.create_rectangle(0, 0, canvas_width, canvas_height, fill=outer_margin_fill, outline="")
         board_left, board_top, board_right, board_bottom = self.sim.topology.playfield_rect
-        board_frame = blend_hex(self.spec.visuals.neutral_large, self.spec.visuals.background, 0.20)
+        board_fill = blend_hex(self.spec.visuals.playfield_overlay, self.spec.visuals.background, 0.92)
+        board_frame = blend_hex(self.spec.visuals.neutral_large, self.spec.visuals.background, 0.18)
+        board_inset = blend_hex(self.spec.visuals.neutral_medium, self.spec.visuals.playfield_overlay, 0.42)
         self.canvas.create_rectangle(
             board_left,
             board_top,
             board_right,
             board_bottom,
-            fill=self.spec.visuals.playfield_overlay,
+            fill=board_fill,
             outline=board_frame,
             width=2,
             tags=("board_surface",),
+        )
+        self.canvas.create_rectangle(
+            board_left + 3,
+            board_top + 3,
+            board_right - 3,
+            board_bottom - 3,
+            fill="",
+            outline=board_inset,
+            width=1,
+            tags=("board_inset",),
         )
         for segment_id, segment in self.sim.topology.segments.items():
             state = self.sim.segment_states[segment_id]
@@ -1275,6 +1388,8 @@ class GridlineApp:
                 font=("Consolas", 10, "bold"),
             )
 
+        self._render_board_event_feedback()
+
         self.canvas.create_text(16, 16, anchor="nw", fill=self.spec.visuals.text, font=("Consolas", 12, "bold"), text=f"Coins {self.sim.coins}   Corruption {self.sim.corruption_percent():.1f}%   Orbs {len(self.sim.orbs)}   Enemies {len(self.sim.enemies)}")
         if self.sim.surge_time_remaining > 0:
             self.canvas.create_text(16, 36, anchor="nw", fill=self.spec.visuals.warning, font=("Consolas", 11, "bold"), text=f"SURGE ACTIVE {self.sim.surge_time_remaining:.1f}s")
@@ -1318,6 +1433,103 @@ class GridlineApp:
             tags=("phase_banner",),
         )
 
+    def _render_board_event_feedback(self) -> None:
+        if self.shell_state not in {"active_run", "paused", "defeat_summary"}:
+            return
+        self._render_surge_feedback()
+        self._render_clean_feedback()
+
+    def _render_surge_feedback(self) -> None:
+        surge_active = self.sim.surge_time_remaining > 0
+        if not surge_active and self._surge_start_time_remaining <= 0 and self._surge_end_fade_time_remaining <= 0:
+            return
+        board_left, board_top, board_right, board_bottom = self.sim.topology.playfield_rect
+        pulse_phase = self._surge_pulse_elapsed / 1.10
+        pulse_wave = 1.0 - abs(1.0 - (pulse_phase * 2.0))
+        persistent_strength = 0.0
+        if surge_active:
+            persistent_strength = 0.20 + pulse_wave * 0.28
+        elif self._surge_end_fade_time_remaining > 0:
+            persistent_strength = 0.26 * (self._surge_end_fade_time_remaining / 0.25)
+        if persistent_strength > 0:
+            color = blend_hex("#F2C46D", self.spec.visuals.background, 0.30 + persistent_strength)
+            width = 1.5 + persistent_strength * 1.8
+            corner = 26 + pulse_wave * 8
+            offset = 6
+            corners = (
+                (board_left - offset, board_top - offset, 1, 1),
+                (board_right + offset, board_top - offset, -1, 1),
+                (board_left - offset, board_bottom + offset, 1, -1),
+                (board_right + offset, board_bottom + offset, -1, -1),
+            )
+            for x, y, dx, dy in corners:
+                self.canvas.create_line(x, y, x + dx * corner, y, fill=color, width=width, capstyle=tk.ROUND, tags=("board_event_feedback", "surge_feedback"))
+                self.canvas.create_line(x, y, x, y + dy * corner, fill=color, width=width, capstyle=tk.ROUND, tags=("board_event_feedback", "surge_feedback"))
+        if self._surge_start_time_remaining > 0:
+            start_strength = self._surge_start_time_remaining / 0.65
+            color = blend_hex("#FFD36A", self.spec.visuals.background, 0.25 + start_strength * 0.70)
+            self.canvas.create_rectangle(
+                board_left - 8,
+                board_top - 8,
+                board_right + 8,
+                board_bottom + 8,
+                outline=color,
+                width=2.0 + start_strength * 2.0,
+                tags=("board_event_feedback", "surge_feedback"),
+            )
+
+    def _render_clean_feedback(self) -> None:
+        for segment_id, event in self._clean_feedback_events.items():
+            if event["sweep"] > 0:
+                ratio = event["sweep"] / 0.30
+                glow_strength = event["strength"] * (0.45 + ratio * 0.55)
+                core_strength = event["strength"] * (0.35 + ratio * 0.45)
+                bleed = 4.0 + ratio * 4.0
+            else:
+                ratio = event["afterglow"] / 0.40
+                glow_strength = event["strength"] * ratio * 0.38
+                core_strength = event["strength"] * ratio * 0.22
+                bleed = 3.0
+            x1, y1, x2, y2 = self._segment_endpoints_with_bleed(segment_id, bleed)
+            glow_color = blend_hex("#9FE8FF", self.spec.visuals.playfield_overlay, 0.22 + min(1.0, glow_strength) * 0.70)
+            core_color = blend_hex("#6FD7FF", self.spec.visuals.playfield_overlay, 0.18 + min(1.0, core_strength) * 0.72)
+            self.canvas.create_line(
+                x1,
+                y1,
+                x2,
+                y2,
+                fill=glow_color,
+                width=3.0 + glow_strength * 4.0,
+                capstyle=tk.ROUND,
+                tags=("board_event_feedback", "clean_feedback"),
+            )
+            self.canvas.create_line(
+                x1,
+                y1,
+                x2,
+                y2,
+                fill=core_color,
+                width=1.2 + core_strength * 2.2,
+                capstyle=tk.ROUND,
+                tags=("board_event_feedback", "clean_feedback"),
+            )
+
+    def _segment_endpoints_with_bleed(self, segment_id: str, bleed: float) -> tuple[float, float, float, float]:
+        segment = self.sim.topology.segments[segment_id]
+        a = self.sim.topology.nodes[segment.a]
+        b = self.sim.topology.nodes[segment.b]
+        dx = b.x - a.x
+        dy = b.y - a.y
+        length = max(1.0, math.hypot(dx, dy))
+        ux = dx / length
+        uy = dy / length
+        return (
+            a.x - ux * bleed,
+            a.y - uy * bleed,
+            b.x + ux * bleed,
+            b.y + uy * bleed,
+        )
+
     def _render_shell_overlay(self, canvas_width: int, canvas_height: int) -> None:
         if self.shell_state == "active_run":
             return
@@ -1335,10 +1547,10 @@ class GridlineApp:
             0,
             canvas_width,
             canvas_height,
-            fill="#02060A",
+            fill=str(presentation["scrim_fill"]),
             outline="",
-            stipple="gray25",
-            tags=("shell_overlay",),
+            stipple=str(presentation["scrim_stipple"]),
+            tags=("shell_overlay", "shell_scrim"),
         )
         self.canvas.create_rectangle(
             left,

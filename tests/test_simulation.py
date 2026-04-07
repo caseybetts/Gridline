@@ -1,7 +1,7 @@
 from dataclasses import replace
 
 from gridline.app import blend_hex, build_faded_trail_segments, build_orb_trail_points, enemy_render_color
-from gridline.simulation import GameSimulation, Orb
+from gridline.simulation import GameSimulation, HarvestRecord, Orb
 from gridline.app import GridlineApp
 from gridline.spec import default_spec, load_game_spec
 from gridline.topology import build_topology
@@ -425,6 +425,36 @@ def test_harvest_income_creates_popup_and_selected_tower_economy_snapshot():
     assert hud["selected_tower_economy"]["shot_cost"] == 2.0
 
 
+def test_recent_harvest_status_row_stays_compact_while_selection_keeps_context():
+    app = GridlineApp(default_spec())
+    app.root.update()
+    first = next(iter(app.sim.hardpoints.values()))
+    app.sim.selected_hardpoint_id = first.hardpoint.key
+    app.sim.build_tower("basic_tower")
+    tower = first.tower
+    assert tower is not None
+    app.sim.run_time = 24.0
+    app.sim.harvest_history.append(
+        HarvestRecord(
+            timestamp=23.3,
+            segment_id=next(iter(app.sim.segment_states)),
+            amount=14,
+            owner_tower_id=tower.key,
+            owner_hardpoint_id=tower.hardpoint_id,
+            tower_name="Basic Tower",
+            mode_name="Default",
+        )
+    )
+
+    app._refresh_sidebar()
+    app.root.update_idletasks()
+
+    assert "Harvest: +14c | Basic Tower | Default | 0.7s ago" in app.status_text.get()
+    assert "via" not in app.status_text.get()
+    assert "Recent +14c / 6s" in app.detail_text.get()
+    app._quit_app()
+
+
 def test_phase_promotions_are_one_way_and_hud_reports_persistent_phase_state():
     sim = GameSimulation(default_spec())
 
@@ -463,6 +493,75 @@ def test_phase_can_jump_directly_to_critical_and_banner_does_not_stack():
     assert sim.phase_transition_timer == 1.2
 
 
+def test_surge_feedback_renders_as_perimeter_layer_not_second_banner():
+    app = GridlineApp(default_spec())
+    app._start_run()
+    app.root.update_idletasks()
+    app.sim.surge_time_remaining = 5.0
+    app._update_board_event_feedback(0.0, False, {})
+    app._render()
+    app.root.update_idletasks()
+
+    surge_items = app.canvas.find_withtag("surge_feedback")
+    assert surge_items
+    assert not any(app.canvas.type(item) == "text" for item in surge_items)
+    board_left, board_top, _board_right, _board_bottom = app.sim.topology.playfield_rect
+    line_coords = [
+        app.canvas.coords(item)
+        for item in surge_items
+        if app.canvas.type(item) == "line"
+    ]
+    assert any(abs(coords[0] - (board_left - 6)) <= 1 or abs(coords[1] - (board_top - 6)) <= 1 for coords in line_coords)
+    app._quit_app()
+
+
+def test_clean_feedback_renders_as_segment_aligned_board_event():
+    app = GridlineApp(default_spec())
+    app._start_run()
+    first = next(iter(app.sim.hardpoints.values()))
+    app.sim.selected_hardpoint_id = first.hardpoint.key
+    app.sim.build_tower("basic_tower")
+    tower = first.tower
+    assert tower is not None
+
+    segment_id = next(iter(app.sim.segment_states))
+    segment = app.sim.topology.segments[segment_id]
+    app.sim.segment_states[segment_id].color = "red"
+    app.sim.segment_states[segment_id].intensity = 1
+    app.sim.segment_states[segment_id].clean_progress = app.sim.spec.red_clean_thresholds[0] - 0.01
+    orb = Orb(
+        key="orb_clean_feedback",
+        owner_tower_id=tower.key,
+        owner_hardpoint_id=tower.hardpoint_id,
+        segment_id=segment_id,
+        from_node=segment.a,
+        to_node=segment.b,
+        distance_on_segment=0.0,
+        lifetime_remaining=1.0,
+        speed=10.0,
+        damage=0.0,
+        clean_rate=1.0,
+        harvest_rate=0.0,
+        turn_chance=0.0,
+        current_tier=segment.tier,
+        mode="default",
+        home_node_id=first.hardpoint.node_id,
+    )
+    app.sim._apply_orb_to_segment(segment_id, 0.02, orb)
+    app._update_board_event_feedback(0.0, False, {})
+    app._render()
+    app.root.update_idletasks()
+
+    clean_items = app.canvas.find_withtag("clean_feedback")
+    assert clean_items
+    assert not any(app.canvas.type(item) == "text" for item in clean_items)
+    a = app.sim.topology.nodes[segment.a]
+    b = app.sim.topology.nodes[segment.b]
+    clean_lines = [app.canvas.coords(item) for item in clean_items if app.canvas.type(item) == "line"]
+    assert any(abs(coords[0] - a.x) <= 8 and abs(coords[1] - a.y) <= 8 and abs(coords[2] - b.x) <= 8 and abs(coords[3] - b.y) <= 8 for coords in clean_lines)
+    app._quit_app()
+
+
 def test_corruption_seed_creates_pulse_and_enemy_telegraph_darkens():
     sim = GameSimulation(default_spec())
     node_id = next(iter(sim.topology.nodes))
@@ -495,7 +594,8 @@ def test_sidebar_uses_contextual_action_groups():
     assert start_button.winfo_height() >= 20
     assert start_button.winfo_rooty() >= app.root.winfo_rooty()
 
-    app._start_run()
+    app.shell_state = "active_run"
+    app.loop_running = False
     app.root.update_idletasks()
     first = next(iter(app.sim.hardpoints.values()))
     app.sim.selected_hardpoint_id = first.hardpoint.key
@@ -503,7 +603,8 @@ def test_sidebar_uses_contextual_action_groups():
     app.root.update_idletasks()
 
     assert app.action_groups["build"].winfo_manager() == "pack"
-    assert app.action_groups["tower"].winfo_manager() == "pack"
+    assert app.action_groups["tower"].winfo_manager() == ""
+    assert app.action_groups["power"].winfo_manager() == "pack"
     assert app.action_buttons["build_basic_tower"].cget("text") == "Basic | 55c"
     assert app.action_buttons["build_basic_tower"].grid_info()["column"] == 0
     assert app.action_buttons["build_seed_tower"].grid_info()["column"] == 1
@@ -517,10 +618,13 @@ def test_sidebar_uses_contextual_action_groups():
     app.sim.build_tower("seed_tower")
     app._refresh_sidebar()
     app.root.update_idletasks()
+    assert app.action_groups["build"].winfo_manager() == ""
     assert app.action_groups["tower"].winfo_manager() == "pack"
     assert app.action_groups["seed"].winfo_manager() == "pack"
+    assert app.action_groups["power"].winfo_manager() == "pack"
     assert app.action_buttons["upgrade_fire_rate"].grid_info()["column"] == 0
     assert app.action_buttons["upgrade_hp"].grid_info()["column"] == 1
+    assert app.utility_frame.winfo_manager() == ""
 
     app._quit_app()
 
@@ -551,6 +655,8 @@ def test_occupied_hardpoint_selection_resets_action_scroll_to_tower_controls():
     app = GridlineApp(default_spec())
     app.root.geometry("1280x720")
     app.root.update()
+    app.shell_state = "active_run"
+    app.loop_running = False
     hardpoints = list(app.sim.hardpoints.values())
     first = hardpoints[0]
     second = hardpoints[1]
@@ -568,13 +674,22 @@ def test_occupied_hardpoint_selection_resets_action_scroll_to_tower_controls():
     app.root.update_idletasks()
 
     assert 0.0 in calls
-    assert app.action_groups["tower"].winfo_y() + app.action_buttons["buy_secondary"].winfo_height() <= app.action_canvas.winfo_height()
+    assert app.action_groups["build"].winfo_manager() == ""
+    canvas_top = app.action_canvas.winfo_rooty()
+    canvas_bottom = canvas_top + app.action_canvas.winfo_height()
+    first_row_top = app.action_buttons["buy_secondary"].winfo_rooty()
+    last_tower_row_bottom = app.action_buttons["upgrade_grid_access_tier"].winfo_rooty() + app.action_buttons["upgrade_grid_access_tier"].winfo_height()
+    assert first_row_top >= canvas_top
+    assert last_tower_row_bottom <= canvas_bottom
     app._quit_app()
 
 
 def test_action_group_positions_stay_stationary_through_selection_changes():
     app = GridlineApp(default_spec())
+    app.root.geometry("1280x720")
     app.root.update()
+    app.shell_state = "active_run"
+    app.loop_running = False
     hardpoints = list(app.sim.hardpoints.values())
     empty = hardpoints[1]
     occupied = hardpoints[0]
@@ -582,21 +697,19 @@ def test_action_group_positions_stay_stationary_through_selection_changes():
     app.sim.selected_hardpoint_id = empty.hardpoint.key
     app._refresh_sidebar()
     app.root.update_idletasks()
-    empty_positions = {
-        key: app.action_groups[key].winfo_y()
-        for key in ("tower", "seed", "power")
-    }
+    assert app.action_groups["build"].winfo_manager() == "pack"
+    assert app.action_groups["build"].winfo_y() == 0
+    assert app.action_groups["power"].winfo_manager() == "pack"
 
     app.sim.selected_hardpoint_id = occupied.hardpoint.key
     app.sim.build_tower("seed_tower")
     app._refresh_sidebar()
     app.root.update_idletasks()
-    occupied_positions = {
-        key: app.action_groups[key].winfo_y()
-        for key in ("tower", "seed", "power")
-    }
-
-    assert occupied_positions == empty_positions
+    assert app.action_groups["build"].winfo_manager() == ""
+    assert app.action_groups["tower"].winfo_manager() == "pack"
+    assert app.action_groups["tower"].winfo_y() == 0
+    assert app.action_groups["seed"].winfo_manager() == "pack"
+    assert app.action_groups["power"].winfo_manager() == "pack"
     app._quit_app()
 
 
@@ -797,6 +910,8 @@ def test_rendered_board_surface_uses_topology_playfield_rect():
     coords = tuple(round(value, 2) for value in app.canvas.coords(board_items[0]))
     expected = tuple(round(value, 2) for value in app.sim.topology.playfield_rect)
     assert coords == expected
+    inset_items = app.canvas.find_withtag("board_inset")
+    assert len(inset_items) == 1
     app._quit_app()
 
 
@@ -814,6 +929,10 @@ def test_shell_flow_boot_pause_resume_and_defeat_replay():
     assert "READY SHELL" in ready_text
     assert "GRIDLINE READY" in ready_text
     assert "PRIMARY // Start Run" in ready_text
+    scrim_items = app.canvas.find_withtag("shell_scrim")
+    assert len(scrim_items) == 1
+    assert app.canvas.itemcget(scrim_items[0], "fill") == "#07111A"
+    assert app.canvas.itemcget(scrim_items[0], "stipple") == "gray50"
     assert app.utility_buttons["start_run"].cget("bg") == "#245985"
     assert app.utility_buttons["quit"].cget("bg") == "#132235"
 
@@ -844,6 +963,10 @@ def test_shell_flow_boot_pause_resume_and_defeat_replay():
     assert "PAUSE SHELL" in paused_text
     assert "RUN PAUSED" in paused_text
     assert "PRIMARY // Resume" in paused_text
+    paused_scrim_items = app.canvas.find_withtag("shell_scrim")
+    assert len(paused_scrim_items) == 1
+    assert app.canvas.itemcget(paused_scrim_items[0], "fill") == "#02060A"
+    assert app.canvas.itemcget(paused_scrim_items[0], "stipple") == "gray25"
     assert app.utility_buttons["resume"].cget("bg") == "#245985"
     assert app.utility_buttons["replay"].cget("bg") == "#132235"
 

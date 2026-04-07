@@ -10,6 +10,7 @@ from pathlib import Path
 
 ROLES = ("Planner", "Designer", "Coder", "Tester", "Auditor")
 DEFAULT_TERMINAL_MODE = "tabs"
+PROMPT_DIRECTORIES = ("Agent Prompts", "")
 
 
 def ps_single_quote(value: str) -> str:
@@ -47,12 +48,17 @@ def encode_powershell_command(command: str) -> str:
 
 
 def get_prompt_path(role: str, workspace: Path) -> Path:
-    prompt_path = workspace / f"{role}_Prompt.md"
+    candidate_paths = [
+        workspace / directory / f"{role}_Prompt.md" if directory else workspace / f"{role}_Prompt.md"
+        for directory in PROMPT_DIRECTORIES
+    ]
 
-    if not prompt_path.exists():
-        raise FileNotFoundError(f"Prompt file not found for role '{role}': {prompt_path}")
+    for prompt_path in candidate_paths:
+        if prompt_path.exists():
+            return prompt_path
 
-    return prompt_path
+    searched_paths = ", ".join(str(path) for path in candidate_paths)
+    raise FileNotFoundError(f"Prompt file not found for role '{role}'. Searched: {searched_paths}")
 
 
 def build_console_command(role: str, workspace: Path) -> list[str]:
@@ -110,7 +116,7 @@ def launch_windows_terminal_tabs(workspace: Path, dry_run: bool, window_target: 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Open Codex terminals for Planner, Designer, Coder, and Tester roles."
+        description="Open Codex terminals for Planner, Designer, Coder, Tester, and Auditor roles."
     )
     parser.add_argument(
         "--workspace",
